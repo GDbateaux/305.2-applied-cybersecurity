@@ -86,7 +86,7 @@ class KDriveTools:
         except requests.exceptions.RequestException as e:
             return f"Error downloading file: {e}"
 
-    def upload_message_summary(self, text_content, filename="uploaded_file.txt"):
+    def upload_message_summary_KDrive(self, text_content, filename="uploaded_file.txt"):
         """
         USE THIS TOOL to save a summary of an email or conversation to kDrive.
         The file will be automatically saved in the 'Summaries' directory.
@@ -120,13 +120,11 @@ class KDriveTools:
 
         if not response.ok:
             return f"Upload failed: {response.status_code} - {response.text}"
-
-        result = response.json()
-        return f"OK: {result}"
+        return "OK"
     
 if __name__ == "__main__":
     tools = KDriveTools()
 
     print(tools.list_information_for_customers_files())
-    print(tools.upload_message_summary("Hello World from LLM", "ai_note.txt"))
+    print(tools.upload_message_summary_KDrive("Hello World from LLM", "ai_note.txt"))
     print(tools.download_file("39"))
