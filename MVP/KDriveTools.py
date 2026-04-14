@@ -38,44 +38,6 @@ class KDriveTools:
         except requests.exceptions.RequestException as e:
             return f"Error listing files: {e}"
 
-    def upload_email_summary(self, text_content, filename="uploaded_file.txt"):
-        """
-        USE THIS TOOL to save a summary of an email or conversation to kDrive.
-        The file will be automatically saved in the 'Summaries' directory.
-        
-        Args:
-            text_content (str): The summary or text to save.
-            filename (str): Name of the file (e.g., 'meeting_summary_date.txt').
-            
-        Returns:
-            str: Confirmation message with the new file ID.
-        """
-        destination_id="38"
-        url = f"{self.base_url}/3/drive/{self.drive_id}/upload"
-
-        encoded_content = text_content.encode("utf-8")
-        total_size = len(encoded_content)
-
-        params = {
-            "directory_id": int(destination_id),
-            "file_name": filename,
-            "total_size": total_size,
-            "conflict": "rename"
-        }
-
-        response = requests.post(
-            url,
-            headers={"Authorization": self.headers["Authorization"]},
-            params=params,
-            data=encoded_content
-        )
-
-        if not response.ok:
-            return f"Upload failed: {response.status_code} - {response.text}"
-
-        result = response.json()
-        return f"OK: {result}"
-
     def download_file(self, file_id: str):
         """
         USE THIS TOOL to read the actual content of a file found via 'list_information_for_customers_files'.
@@ -124,9 +86,47 @@ class KDriveTools:
         except requests.exceptions.RequestException as e:
             return f"Error downloading file: {e}"
 
+    def upload_message_summary(self, text_content, filename="uploaded_file.txt"):
+        """
+        USE THIS TOOL to save a summary of an email or conversation to kDrive.
+        The file will be automatically saved in the 'Summaries' directory.
+        
+        Args:
+            text_content (str): The summary or text to save.
+            filename (str): Name of the file (e.g., 'meeting_summary_date.txt').
+            
+        Returns:
+            str: Confirmation message with the new file ID.
+        """
+        destination_id="38"
+        url = f"{self.base_url}/3/drive/{self.drive_id}/upload"
+
+        encoded_content = text_content.encode("utf-8")
+        total_size = len(encoded_content)
+
+        params = {
+            "directory_id": int(destination_id),
+            "file_name": filename,
+            "total_size": total_size,
+            "conflict": "rename"
+        }
+
+        response = requests.post(
+            url,
+            headers={"Authorization": self.headers["Authorization"]},
+            params=params,
+            data=encoded_content
+        )
+
+        if not response.ok:
+            return f"Upload failed: {response.status_code} - {response.text}"
+
+        result = response.json()
+        return f"OK: {result}"
+    
 if __name__ == "__main__":
     tools = KDriveTools()
 
     print(tools.list_information_for_customers_files())
-    print(tools.upload_email_summary("Hello World from LLM", "ai_note.txt"))
+    print(tools.upload_message_summary("Hello World from LLM", "ai_note.txt"))
     print(tools.download_file("39"))
