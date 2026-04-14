@@ -8,7 +8,6 @@ dependencies = [
     "caldav>=3.1.0",
     "python-dotenv>=1.2.2",
     "ddgs>=9.13.1",
-    "python-dotenv>=1.2.2",
     "python-telegram-bot>=22.7",
     "requests>=2.33.1",
 ]
