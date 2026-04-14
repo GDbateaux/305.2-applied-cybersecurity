@@ -124,8 +124,9 @@ class KDriveTools:
         except requests.exceptions.RequestException as e:
             return f"Error downloading file: {e}"
 
-tools = KDriveTools()
+if __name__ == "__main__":
+    tools = KDriveTools()
 
-print(tools.list_accessible_files())
-print(tools.upload_file_from_text("Hello World from LLM", "ai_note.txt"))
-print(tools.download_file("39"))
+    print(tools.list_information_for_customers_files())
+    print(tools.upload_email_summary("Hello World from LLM", "ai_note.txt"))
+    print(tools.download_file("39"))
