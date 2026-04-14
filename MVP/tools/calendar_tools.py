@@ -100,7 +100,7 @@ def create_calendar_event(summary, start_time, duration_hours=1, description="",
         end_time = start_time + timedelta(hours=duration_hours)
 
         # 2. Check for availability
-        conflicts = my_calendar.date_search(start=start_time, end=end_time)
+        conflicts = my_calendar.search(start=start_time, end=end_time, event=True)
         
         if len(conflicts) > 0:
             print(f"Conflict detected: You already have {len(conflicts)} event(s) at this time.")
