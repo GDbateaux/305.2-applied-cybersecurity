@@ -1,0 +1,4 @@
+.env
+.venv
+kdrive_cache
+__pycache__/
