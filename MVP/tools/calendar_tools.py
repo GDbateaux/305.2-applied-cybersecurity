@@ -10,18 +10,37 @@ URL = "https://sync.infomaniak.com/calendars"
 USERNAME = os.getenv("CALENDAR_USERNAME")
 PASSWORD = os.getenv("CALENDAR_PASSWORD")
 
-def get_calendar():
-    """Helper function to connect and return the primary calendar"""
-    client = caldav.DAVClient(url=URL, username=USERNAME, password=PASSWORD)
-    principal = client.principal()
-    calendars = principal.calendars()
-    return calendars[0] if calendars else None
+def get_calendar(target_name=None):
+    """
+    Connects to Infomaniak and returns a specific calendar by name.
+    If target_name is None, returns the primary calendar.
+    """
+    try:
+        client = caldav.DAVClient(url=URL, username=USERNAME, password=PASSWORD)
+        principal = client.principal()
+        calendars = principal.calendars()
+        if not calendars:
+            print("No calendars found.")
+            return None
 
-def get_free_slots(start_from, duration_hours=1.5, days_to_scan=3):
+        if target_name:
+            for cal in calendars:
+                display_name = cal.get_display_name()
+                if target_name.lower() in display_name.lower():
+                    print(f"Using calendar: {display_name}")
+                    return cal
+            print(f"Warning: Calendar '{target_name}' not found. Using primary.")
+        
+        return calendars[0]
+    except Exception as e:
+        print(f"Connection Error: {e}")
+        return None
+
+def get_free_slots(start_from, duration_hours=1.5, days_to_scan=3, target_calendar="Garage"):
     """
     Scans the calendar for free time slots of a specific duration.
     """
-    calendar = get_calendar()
+    calendar = get_calendar(target_calendar)
     if not calendar:
         return []
 
@@ -67,33 +86,27 @@ def get_free_slots(start_from, duration_hours=1.5, days_to_scan=3):
 
     return free_slots
 
-def create_calendar_event(summary, start_time, duration_hours=1, description=""):
+def create_calendar_event(summary, start_time, duration_hours=1, description="", target_calendar="Garage"):
     # --- Configuration ---
     # Use an Application Password from Infomaniak Manager (Security > App Passwords)
     
     try:
-        # 1. Connect to the server
-        client = caldav.DAVClient(url=URL, username=USERNAME, password=PASSWORD)
-        principal = client.principal()
-        
-        # 2. Get your primary calendar
-        # Infomaniak usually lists the primary calendar first
-        calendars = principal.calendars()
-        if not calendars:
+        # 1. Get calendar
+        my_calendar = get_calendar(target_calendar)
+        if not my_calendar:
             print("No calendars found.")
             return
         
-        my_calendar = calendars[0]
         end_time = start_time + timedelta(hours=duration_hours)
 
-        # 3. Check for availability (Optional but recommended)
+        # 2. Check for availability
         conflicts = my_calendar.date_search(start=start_time, end=end_time)
         
         if len(conflicts) > 0:
             print(f"Conflict detected: You already have {len(conflicts)} event(s) at this time.")
             return None
 
-        # 4. Create the event
+        # 3. Create the event
         new_event = my_calendar.save_event(
             dtstart=start_time,
             dtend=end_time,
@@ -123,7 +136,8 @@ if __name__ == "__main__":
     else:
         print(f"No free slots found in the next {days_to_scan} days.")
 
-    # Example of creating an event (uncomment to test)
+    
+    
     # Define your event details
     event_title = "Test"
     # Set time for tomorrow at 2 PM
