@@ -28,16 +28,6 @@ class Bike(SQLModel, table=True):
     orders: List["Order"] = Relationship(back_populates="bike")
     stock: Optional["StockBike"] = Relationship(back_populates="bike")
 
-class Discount(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    value: float
-    starts_at: datetime
-    ends_at: datetime
-    active: bool = Field(default=False)
-    
-    # Relationships
-    orders: List["Order"] = Relationship(back_populates="discount")
-
 class StockBike(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     bike_id: int = Field(foreign_key="bike.id")
@@ -50,7 +40,6 @@ class Order(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
     bike_id: int = Field(foreign_key="bike.id")
-    discount_id: Optional[int] = Field(default=None, foreign_key="discount.id")
     total_price: float
     is_validated: bool = Field(default=False)
     order_at: datetime = Field(default_factory=datetime.now)
@@ -58,7 +47,6 @@ class Order(SQLModel, table=True):
     # Relationships
     user: User = Relationship(back_populates="orders")
     bike: Bike = Relationship(back_populates="orders")
-    discount: Optional[Discount] = Relationship(back_populates="orders")
 
 # --- DATABASE CONNECTION ---
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -70,4 +58,3 @@ def create_db_and_tables():
 
 if __name__ == "__main__":
     create_db_and_tables()
-    
