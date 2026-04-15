@@ -30,6 +30,14 @@ CREATE TABLE "discounts" (
   "active" bool DEFAULT false
 );
 
+CREATE TABLE "stock_bikes" (
+  "id" integer PRIMARY KEY,
+  "bike_id" integer NOT NULL,
+  "number" integer
+);
+
+ALTER TABLE "stock_bikes" ADD CONSTRAINT "stock_bikes" FOREIGN KEY ("bike_id") REFERENCES "bikes" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+
 ALTER TABLE "order" ADD CONSTRAINT "discout_order" FOREIGN KEY ("discount_id") REFERENCES "discounts" ("id") DEFERRABLE INITIALLY IMMEDIATE;
 
 ALTER TABLE "order" ADD CONSTRAINT "user_order" FOREIGN KEY ("user_id") REFERENCES "users" ("id") DEFERRABLE INITIALLY IMMEDIATE;
