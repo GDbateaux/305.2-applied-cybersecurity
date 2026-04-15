@@ -12,7 +12,6 @@ TOKEN = os.getenv("KDRIVE_TOKEN")
 BASE_URL = f"https://api.infomaniak.com"
 HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
-
 def list_information_files_in_folder(folder_id: str):
     url = f"{BASE_URL}/3/drive/{DRIVE_ID}/files/{folder_id}/files"
     try:
@@ -34,16 +33,17 @@ def list_files_for_patient(patient_id: str):
     result = list_information_files_in_folder(base_directory_id)
     if isinstance(result, str):
         return result
-    
+
+    patient_directory_id = None
     for file in result:
-        if file["name"] == patient_id and file["type"] == "dir":
+        if file["name"] == str(patient_id) and file["type"] == "dir":
             patient_directory_id = file["id"]
+            break
 
     if not patient_directory_id:
         return f"No directory found for ID {patient_id}."
 
     return list_information_files_in_folder(patient_directory_id)
-
 
 def download_file(patient_id: str, file_id: str):
     patient_files = list_files_for_patient(patient_id)
@@ -61,7 +61,7 @@ def download_file(patient_id: str, file_id: str):
 
     filename = file_obj["name"]
 
-    local_dir = Path(__file__).parent.parent / "kdrive_cache"
+    local_dir = Path(__file__).parent.parent / "kdrive_cache" / str(patient_id)
     local_dir.mkdir(parents=True, exist_ok=True)
 
     local_path = local_dir / filename
@@ -105,34 +105,51 @@ def upload_message_summary_KDrive(text_content, filename="uploaded_file.txt"):
     return True
 
 
-@tool
-def read_kdrive_file(patient_id: str, file_id: str) -> str:
-    """Reads the contents of a kDrive file by its ID.
-    Supports: .txt, .csv, .pdf, .docx, .xlsx.
-    Use this after search_kdrive to read a specific file.
-    Parameter: file_id (the ID returned by search_kdrive)."""
-    local_path = download_file(patient_id, file_id)
-    if isinstance(local_path, str) and local_path.startswith("Error"):
-        return f"Download error: {local_path}"
-    return extract_text(local_path)
+def build_kdrive_tools(patient_id: str):
+    @tool
+    def search_kdrive(query: str) -> str:
+        """Lists available documents in the patient's kDrive folder.
+        Always call this first to get file IDs before reading a file.
+        Parameter: query (keyword to filter by name, or 'all' to list everything)."""
+        files = list_files_for_patient(patient_id)
+        if isinstance(files, str):
+            return files
+        if query.lower() != "all":
+            files = [f for f in files if query.lower() in f["name"].lower()]
+        if not files:
+            return "No matching files found."
+        return "\n".join(f"- {f['name']} (id: {f['id']}, type: {f['type']})" for f in files)
 
+    @tool
+    def read_kdrive_file(file_id: str) -> str:
+        """Reads the contents of a kDrive file by its ID.
+        Supports: .txt, .csv, .pdf, .docx, .xlsx.
+        Use this after search_kdrive to read a specific file.
+        Parameter: file_id (the ID returned by search_kdrive)."""
+        local_path = download_file(patient_id, file_id)
+        if isinstance(local_path, str) and local_path.startswith("Error"):
+            return f"Download error: {local_path}"
+        return extract_text(local_path)
 
-@tool
-def summarize_and_store_feedback(patient_id: str, content: str, author: str, project: str) -> str:
-    """Summarizes customer feedback and stores it in kDrive.
-    ALWAYS call this immediately when a message contains a review, complaint, or suggestion.
-    Do NOT promise to save — just call this tool directly.
-    Parameters: content (customer message), author (Telegram ID or name),
-    project (product or topic; use 'general' if unknown)."""
-    now = datetime.now()
-    filename = f"feedback_{author}_{now.strftime('%Y-%m-%d_%H-%M')}.txt"
-    summary = (
-        f"Date: {now.strftime('%Y-%m-%d %H:%M')}\n"
-        f"Author: {author}\n"
-        f"Project: {project}\n\n"
-        f"Content:\n{content}\n"
-    )
-    result = upload_message_summary_KDrive(patient_id, summary, filename)
-    if result:
-        return f"Feedback stored in kDrive as '{filename}'."
-    return f"Error storing feedback: {result}"
+    @tool
+    def summarize_and_store_feedback(content: str, author: str, project: str) -> str:
+        """Summarizes customer feedback and stores it in kDrive.
+        ALWAYS call this immediately when a message contains a review, complaint, or suggestion.
+        Do NOT promise to save — just call this tool directly.
+        Parameters: content (customer message), author (Telegram ID or name),
+        project (product or topic; use 'general' if unknown)."""
+        now = datetime.now()
+        filename = f"feedback_{author}_{now.strftime('%Y-%m-%d_%H-%M')}.txt"
+        summary = (
+            f"Date: {now.strftime('%Y-%m-%d %H:%M')}\n"
+            f"Author: {author}\n"
+            f"Project: {project}\n\n"
+            f"Content:\n{content}\n"
+        )
+        result = upload_message_summary_KDrive(summary, filename)
+        if result:
+            return f"Feedback stored in kDrive as '{filename}'."
+        return f"Error storing feedback: {result}"
+        
+    
+    return [search_kdrive, read_kdrive_file, summarize_and_store_feedback]
