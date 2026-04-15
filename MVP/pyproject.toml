@@ -10,4 +10,6 @@ dependencies = [
     "ddgs>=9.13.1",
     "python-telegram-bot>=22.7",
     "requests>=2.33.1",
+    "sqlmodel>=0.0.38",
+    "psycopg2>=2.9.11",
 ]
