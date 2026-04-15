@@ -4,63 +4,53 @@ from sqlmodel import Session
 from models import (
     engine,
     create_db_and_tables,
-    User,
-    Bike,
-    StockBike,
+    Doctor,
+    Patient,
 )
 
 
 def seed():
+    # 1. Create the tables if they don't exist
     create_db_and_tables()
 
     with Session(engine) as session:
         # -------------------
-        # USERS
+        # DOCTORS
         # -------------------
-        users = [
-            User(username="admin", password="admin123"),
-            User(username="alice", password="alice123"),
-            User(username="bob", password="bob123"),
-            User(username="charlie", password="charlie123"),
+        # Using realistic 9-digit Telegram IDs
+        doctors = [
+            Doctor(telegram_id=111222333, name="Gregory", surname="House"),
+            Doctor(telegram_id=444555666, name="Meredith", surname="Grey"),
+            Doctor(telegram_id=777888999, name="Shaun", surname="Murphy"),
         ]
 
-        session.add_all(users)
+        session.add_all(doctors)
         session.commit()
 
-        # refresh IDs
-        for user in users:
-            session.refresh(user)
+        # Refresh to get the auto-generated database IDs
+        for doctor in doctors:
+            session.refresh(doctor)
 
         # -------------------
-        # BIKES
+        # PATIENTS
         # -------------------
-        bikes = [
-            Bike(name="Mountain Bike Pro", price=1200.0, maintenance_time=time(1, 0)),
-            Bike(name="Road Bike Speed", price=1500.0, maintenance_time=time(0, 45)),
-            Bike(name="City Bike Comfort", price=600.0, maintenance_time=time(0, 30)),
-            Bike(name="Electric Bike E100", price=2500.0, maintenance_time=time(2, 0)),
+        # Assigning specific patients to our doctors using the primary keys (id)
+        patients = [
+            # Patients for Dr. House
+            Patient(telegram_id=123456789, name="John", surname="Doe", doctor_id=doctors[0].id),
+            Patient(telegram_id=987654321, name="Jane", surname="Smith", doctor_id=doctors[0].id),
+            
+            # Patients for Dr. Grey
+            Patient(telegram_id=555444333, name="Arthur", surname="Morgan", doctor_id=doctors[1].id),
+            
+            # Patient for Dr. Murphy
+            Patient(telegram_id=666777888, name="Walter", surname="White", doctor_id=doctors[2].id),
         ]
 
-        session.add_all(bikes)
+        session.add_all(patients)
         session.commit()
 
-        for bike in bikes:
-            session.refresh(bike)
-
-        # -------------------
-        # STOCK
-        # -------------------
-        stocks = [
-            StockBike(bike_id=bikes[0].id, number=5),
-            StockBike(bike_id=bikes[1].id, number=3),
-            StockBike(bike_id=bikes[2].id, number=10),
-            StockBike(bike_id=bikes[3].id, number=2),
-        ]
-
-        session.add_all(stocks)
-        session.commit()
-
-        print("Database seeded successfully!")
+        print("Healthcare database seeded successfully!")
 
 
 if __name__ == "__main__":
