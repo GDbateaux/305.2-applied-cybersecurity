@@ -3,6 +3,7 @@ import requests
 from dotenv import load_dotenv
 from langchain_core.tools import tool
 from datetime import datetime
+from pathlib import Path
 
 
 load_dotenv()
@@ -53,11 +54,10 @@ def download_file(file_id: str):
         return f"Error retrieving file name: {e}"
 
 
-    local_dir = "kdrive_cache"
-    os.makedirs(local_dir, exist_ok=True)
+    local_dir = Path(__file__).parent.parent / "kdrive_cache"
+    local_dir.mkdir(parents=True, exist_ok=True)
 
-
-    local_path = os.path.join(local_dir, filename)
+    local_path = local_dir / filename
 
 
     download_url = f"{BASE_URL}/2/drive/{DRIVE_ID}/files/{file_id}/download"
