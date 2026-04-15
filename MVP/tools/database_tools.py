@@ -1,108 +1,38 @@
 from sqlmodel import Session, select
-from database_model.models import Bike, StockBike, Order, engine
-from datetime import datetime
+from sqlalchemy.orm import joinedload
+from database_model.models import Doctor, Patient
 
-def get_available_bikes(session: Session):
+def get_patients_by_doctor_telegram(session: Session, doctor_telegram_id: int):
     """
-    Fetch all bikes that have at least one unit remaining in stock.
+    Finds a doctor by their Telegram ID, then returns all their patients.
+    """
+    # 1. Find the doctor record matching the Telegram ID
+    statement = select(Doctor).where(Doctor.telegram_id == doctor_telegram_id)
+    doctor = session.exec(statement).first()
     
-    Args:
-        session (Session): The active SQLModel database session.
-        
-    Returns:
-        list[dict]: A list of dictionaries containing the ID, name, and price of available bikes.
+    if not doctor:
+        print(f"Error: No doctor found with Telegram ID {doctor_telegram_id}")
+        return []
+
+    # 2. Return the list of patients via the relationship
+    return doctor.patients
+
+def get_doctor_by_patient_telegram(session: Session, patient_telegram_id: int):
     """
-    # Create a query to select Bikes joined with their Stock information
-    # Filter only those where the stock count is greater than zero
-    statement = select(Bike).join(StockBike).where(StockBike.number > 0)
-    
-    # Execute the query and retrieve all matching records
-    results = session.exec(statement).all()
-
-    # Format the result set into a list of clean dictionaries
-    return [
-        {"id": result.id, "name": result.name, "price": result.price}
-        for result in results
-    ]
-    
-def add_order_bike(session: Session, user_id: int, bike_id: int):
+    Finds a patient by their Telegram ID, then returns their assigned doctor.
     """
-    Handles the bike ordering process by verifying stock, calculating price,
-    recording the order, and updating inventory in a single transaction.
-
-    Args:
-        session (Session): The active database session.
-        user_id (int): ID of the user placing the order.
-        bike_id (int): ID of the bike being ordered.
-
-    Returns:
-        Order: The newly created order object, or None if the process fails.
-    """
-
-    # 1. Check if the bike is in stock
-    stock_statement = select(StockBike).where(StockBike.bike_id == bike_id)
-    stock_item = session.exec(stock_statement).first()
-
-    if not stock_item or stock_item.number <= 0:
-        print(f"Error: Bike ID {bike_id} is out of stock.")
-        return None
-
-    # 2. Retrieve bike details for pricing
-    bike = session.get(Bike, bike_id)
-    if not bike:
-        print(f"Error: Bike ID {bike_id} not found.")
-        return None
-
-    # 3. Instantiate the new order
-    new_order = Order(
-        user_id=user_id,
-        bike_id=bike_id,
-        discount_id=None,
-        total_price=bike.price,
-        is_validated=False,
-        order_at=datetime.now()
+    # 1. Find the patient and eager-load the doctor relationship
+    statement = (
+        select(Patient)
+        .where(Patient.telegram_id == patient_telegram_id)
+        .options(joinedload(Patient.doctor))
     )
     
-    # 4. Update the stock count
-    stock_item.number -= 1
-    
-    # 5. Save changes
-    session.add(new_order)
-    session.add(stock_item)
-    session.commit()
-    
-    # Refresh to get the generated order ID
-    session.refresh(new_order)
-    print(f"Order #{new_order.id} placed successfully at CHF{bike.price:.2f}!")
-    return new_order
+    patient = session.exec(statement).first()
 
-def get_bike_price(session: Session, bike_id: int) -> float:
-    """
-    Retrieve the unit price of a specific bike from the database.
+    if not patient:
+        print(f"Error: No patient found with Telegram ID {patient_telegram_id}")
+        return None
 
-    Args:
-        session (Session): The active SQLModel database session.
-        bike_id (int): The unique identifier of the bike.
-
-    Returns:
-        float: The price of the bike if found.
-
-    Raises:
-        ValueError: If no bike matches the provided bike_id.
-    """
-    # Attempt to fetch the bike record by its primary key
-    bike = session.get(Bike, bike_id)
-
-    # If the bike exists, return its price attribute
-    if bike:
-        return bike.price
-    # If the record is missing, raise an error to prevent further logic errors
-    else:
-        raise ValueError("Bike does not exist.")
-
-with Session(engine) as session:
-    bikes = get_available_bikes(session)
-    add_order_bike(session, user_id=1, bike_id=1)
-    bike_price = get_bike_price(session, 1)
-    print(bikes)
-    print(bike_price)
+    # 2. Return the doctor object linked to this patient
+    return patient.doctor

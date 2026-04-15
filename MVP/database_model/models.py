@@ -8,45 +8,38 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- MODELS (Tables) ---
-class User(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    username: str
-    password: str
-    created_at: datetime = Field(default_factory=datetime.now)
-    
-    # Relationships
-    orders: List["Order"] = Relationship(back_populates="user")
+# --- MODELS ---
 
-class Bike(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
-    price: float
-    maintenance_time: time
-    
-    # Relationships
-    orders: List["Order"] = Relationship(back_populates="bike")
-    stock: Optional["StockBike"] = Relationship(back_populates="bike")
+class Doctor(SQLModel, table=True):
+    """
+    Represents a doctor in the system.
+    """
+    __tablename__ = "doctors"
 
-class StockBike(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    bike_id: int = Field(foreign_key="bike.id")
-    number: int = Field(default=0)
-    
-    # Relationships
-    bike: Bike = Relationship(back_populates="stock")
+    telegram_id: int = Field(sa_type="BIGINT", nullable=False)
+    name: str = Field(nullable=False)
+    surname: str = Field(nullable=False)
 
-class Order(SQLModel, table=True):
+    # Relationship: A doctor can have multiple patients
+    patients: List["Patient"] = Relationship(back_populates="doctor")
+
+
+class Patient(SQLModel, table=True):
+    """
+    Represents a patient assigned to a specific doctor.
+    """
+    __tablename__ = "patients"
+
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id")
-    bike_id: int = Field(foreign_key="bike.id")
-    total_price: float
-    is_validated: bool = Field(default=False)
-    order_at: datetime = Field(default_factory=datetime.now)
+    telegram_id: int = Field(sa_type="BIGINT", nullable=False)
+    # This foreign key links to the doctor's ID
+    doctor_id: int = Field(foreign_key="doctors.id", nullable=False)
+    name: str = Field(nullable=False)
+    surname: str = Field(nullable=False)
 
-    # Relationships
-    user: User = Relationship(back_populates="orders")
-    bike: Bike = Relationship(back_populates="orders")
+    # Relationship: Each patient belongs to one doctor
+    doctor: Optional[Doctor] = Relationship(back_populates="patients")
 
 # --- DATABASE CONNECTION ---
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -58,3 +51,4 @@ def create_db_and_tables():
 
 if __name__ == "__main__":
     create_db_and_tables()
+    
