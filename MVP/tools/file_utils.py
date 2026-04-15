@@ -1,7 +1,6 @@
-import os
-
-def extract_text(local_path: str) -> str:
+def extract_text(local_path) -> str:
     """Extract text from a local file based on its file extension."""
+    local_path = str(local_path)
     try:
         if local_path.endswith((".txt", ".md", ".csv")):
             with open(local_path, "r", encoding="utf-8") as f:
