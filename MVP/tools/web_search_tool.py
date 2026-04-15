@@ -1,27 +1,21 @@
 from ddgs import DDGS
+from langchain_core.tools import tool
 
-def web_search(query: str, max_results: int = 5):
-    """
-    USE THIS TOOL to find real-time information, news, or facts 
-    from the internet that are not in your internal database.
-    
-    Args:
-        query (str): The search keywords or question.
-        max_results (int): Number of results to return.
-        
-    Returns:
-        list: A list of results with 'title', 'href', and 'body'.
-    """
+
+@tool
+def search_internet(query: str) -> str:
+    """Search for information online.
+    Use this ONLY if search_kdrive + read_kdrive_file return no relevant results.
+    Parameter: query (keywords to search for)."""
     try:
         with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=max_results))
-            
+            results = list(ddgs.text(query, max_results=5))
         if not results:
-            return "Search yielded no results. Try broadening your keywords."
-            
-        return results
+            return "No results found. Try different keywords."
+        # Format results for the LLM
+        formatted = []
+        for r in results:
+            formatted.append(f"Title: {r.get('title', '')}\nURL: {r.get('href', '')}\nSummary: {r.get('body', '')}")
+        return "\n\n".join(formatted)
     except Exception as e:
-        return f"Error during web search: {e}"
-
-if __name__ == "__main__":
-    print(web_search("Infomaniak kDrive API news 2026"))
+        return f"Search error: {e}"
