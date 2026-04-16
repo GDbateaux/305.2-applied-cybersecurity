@@ -135,9 +135,19 @@ def upload_message_summary_KDrive(text_content, filename="uploaded_file.txt"):
         raise Exception(f"Failed to upload file: {response.status_code} {response.text}")
     return True
 
+def add_patient_folder(patient_id: str):
+    url = f"{BASE_URL}/3/drive/{DRIVE_ID}/files/{BASE_DIRECTORY_ID}/directory"
+    payload = {
+        "name": str(patient_id),
+    }
+    try:
+        response = requests.post(url, headers=HEADERS, json=payload)
+        response.raise_for_status()
+        return response.json().get("data", {})
+    except requests.exceptions.RequestException as e:
+        return f"Error creating patient folder: {e}"
 
 def build_kdrive_tools(patient_id: str | None):
-
     def list_files_for_context(target_patient_id: str | None = None):
         if patient_id is None and target_patient_id is None:
             folders = list_information_files_in_folder(BASE_DIRECTORY_ID)

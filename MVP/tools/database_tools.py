@@ -4,6 +4,7 @@ from sqlmodel import Session, create_engine, select
 from sqlalchemy.orm import joinedload
 from database_model.models import Doctor, Patient
 from langchain_core.tools import tool
+from tools.kdrive_tools import add_patient_folder
 
 def get_patients_by_doctor_telegram(session: Session, doctor_telegram_id: int):
     """
@@ -78,6 +79,9 @@ def create_new_patient(session: Session, telegram_id: int, doctor_id: int, name:
         session.refresh(new_patient)
         
         print(f"Patient {name} {surname} successfully created with ID {new_patient.id}.")
+        response = add_patient_folder(new_patient.id)
+        if type(response) == str and response.startswith("Error"):
+            print(f"Warning: Patient created but failed to create folder in KDrive. {response}")
         return new_patient
 
     except Exception as e:
