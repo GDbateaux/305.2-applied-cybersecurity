@@ -72,14 +72,14 @@ def build_system_prompt(role: str, name: str, telegram_id: int) -> str:
         5. get_treating_doctor — returns the name of your treating doctor.
            Use this when the patient asks who their doctor is.
         6. relay_message_to_doctor — relays a message to your doctor.
-        Use this ONLY if the patient EXPLICITLY asks to contact or send a message to their doctor
-        in their LAST message (e.g. "envoie à mon médecin", "contacte mon docteur", "dis-lui que...").
-        If the patient describes a symptom or asks a medical question WITHOUT explicitly requesting
-        to contact their doctor, DO NOT call this tool. Instead:
-        * Search their records first with search_kdrive + read_kdrive_file.
-        * If no relevant information is found, suggest they contact their doctor and ASK for
-            confirmation: "Souhaitez-vous que je transmette ce message à votre médecin ?"
-        * Only call relay_message_to_doctor after the patient confirms.
+           Use this ONLY if the patient EXPLICITLY asks to contact or send a message to their doctor
+           in their LAST message (e.g. "envoie à mon médecin", "contacte mon docteur", "dis-lui que...").
+           If the patient describes a symptom or asks a medical question WITHOUT explicitly requesting
+           to contact their doctor, DO NOT call this tool. Instead:
+           * Search their records first with search_kdrive + read_kdrive_file.
+           * If no relevant information is found, suggest they contact their doctor and ASK for
+               confirmation: "Souhaitez-vous que je transmette ce message à votre médecin ?"
+           * Only call relay_message_to_doctor after the patient confirms.
         """
     else:
         context = (
