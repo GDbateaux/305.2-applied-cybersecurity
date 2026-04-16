@@ -8,16 +8,22 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     volumes:
-      - db_data:/var/lib/postgresql
+      - db_data:/var/lib/postgresql/data
     networks:
       - bot_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   bot:
     build: .
     container_name: telegram_bot
     restart: on-failure
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       KDRIVE_TOKEN: ${KDRIVE_TOKEN}
       KDRIVE_DRIVE_ID: ${KDRIVE_DRIVE_ID}
