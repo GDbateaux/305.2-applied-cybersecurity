@@ -1,0 +1,2 @@
+bot = None
+loop = None
