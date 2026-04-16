@@ -71,7 +71,10 @@ You have access to the following tools:
 5. get_patient_list — (doctors only) returns the list of patients assigned to you.
    Use this when the doctor asks about their patients.
 
-6. get_treating_doctor — (patients only) returns the name of your treating doctor.
+6. get_patient_id_by_name — (doctors only) resolves a patient's ID from their name.
+   Always call this before search_kdrive or read_kdrive_file when referring to a patient by name.
+
+7. get_treating_doctor — (patients only) returns the name of your treating doctor.
    Use this when the patient asks who their doctor is.
 
 Important rules:
@@ -83,8 +86,9 @@ Important rules:
     * Always start by searching their records with search_kdrive, then read relevant files with read_kdrive_file.
     * If the records contain relevant information or advice, relay it clearly and faithfully.
     * Whether or not relevant information was found, ALWAYS end your response with:
-      "For more information or if you have any concerns, please feel free to contact your primary care physician."
+      "Pour plus d'informations ou si vous avez des questions, n'hésitez pas à contacter votre médecin traitant."
 - If you don't know or cannot find the answer, say so honestly and suggest contacting the practice directly.
+- When a doctor refers to a patient by name, always call get_patient_id_by_name first to resolve their patient_id before calling search_kdrive or read_kdrive_file.
 """
     return prompt
 
@@ -134,25 +138,18 @@ async def handle_message(text: str, telegram_id: int) -> str:
     if not patient and not doctor:
         logger.warning("[request] No patient or doctor found for Telegram ID %s", telegram_id)
         return "Vous n'êtes pas enregistré. Contactez votre cabinet."
-    
-    if not patient.id and not doctor.id:
-        logger.warning("[request] Telegram ID %s has no linked patient or doctor record", telegram_id)
-        return "Votre compte n'est pas correctement configuré. Contactez votre cabinet."
 
     if doctor:
         role = "doctor"
         name = f"{doctor.name} {doctor.surname}"
-        with Session(engine) as session:
-            db_tools = build_database_tools(engine=engine, id=doctor.id)
-        all_tools = build_kdrive_tools(patient_id=None) + STATIC_TOOLS + [db_tools[0]] # Doctor has access to the patient list tool
-
+        db_tools = build_database_tools(engine=engine, id=doctor.id)
+        all_tools = build_kdrive_tools(patient_id=None) + STATIC_TOOLS + [db_tools[0], db_tools[1]]  # get_patient_list + get_patient_id_by_name 
         logger.info("[request] doctor_id=%s text=%s", doctor.id, text)
     else:
         role = "patient"
         name = f"{patient.name} {patient.surname}"
-        with Session(engine) as session:
-            db_tools = build_database_tools(engine=engine, id=patient.id)
-        all_tools = build_kdrive_tools(str(patient.id)) + STATIC_TOOLS + [db_tools[1]] # Patient has access to the treating doctor tool
+        db_tools = build_database_tools(engine=engine, id=patient.id)
+        all_tools = build_kdrive_tools(str(patient.id)) + STATIC_TOOLS + [db_tools[2]] # get_treating_doctor
 
         logger.info("[request] patient_id=%s text=%s", patient.id, text)
 

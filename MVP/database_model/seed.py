@@ -21,7 +21,7 @@ def seed():
         doctors = [
             Doctor(telegram_id=111222333, name="Gregory", surname="House"),
             Doctor(telegram_id=444555666, name="Meredith", surname="Grey"),
-            Doctor(telegram_id=777888999, name="Shaun", surname="Murphy"),
+            Doctor(telegram_id=8794985042, name="Robin", surname="Bütikofer"),
         ]
 
         session.add_all(doctors)

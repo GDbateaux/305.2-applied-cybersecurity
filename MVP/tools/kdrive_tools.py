@@ -138,28 +138,48 @@ def upload_message_summary_KDrive(text_content, filename="uploaded_file.txt"):
 
 def build_kdrive_tools(patient_id: str | None):
 
-    def list_files_for_context():
-        if patient_id is None:
-            return list_information_files_in_folder(BASE_DIRECTORY_ID)
+    def list_files_for_context(target_patient_id: str | None = None):
+        if patient_id is None and target_patient_id is None:
+            folders = list_information_files_in_folder(BASE_DIRECTORY_ID)
+            if isinstance(folders, str):
+                return folders
+            return [f for f in folders if f["type"] == "dir"]
         else:
-            return list_files_for_patient(patient_id)
-        
+            pid = patient_id or target_patient_id
+            return list_files_for_patient(pid)
+
     def download_file_for_context(file_id: str):
         if patient_id is None:
             return download_file_unrestricted(file_id)
         else:
             return download_file(patient_id, file_id)
 
-    @tool
-    def search_kdrive() -> str:
-        """Lists all available documents in the patient's kDrive folder.
-        Always call this first to get the list of file IDs before reading a file."""
-        files = list_files_for_context()
-        if isinstance(files, str):
-            return files
-        if not files:
-            return "No files found."
-        return "\n".join(f"- {f['name']} (id: {f['id']}, type: {f['type']})" for f in files)
+    if patient_id is not None:
+        @tool
+        def search_kdrive() -> str:
+            """Lists all documents available in your personal medical folder.
+            Always call this first to get file IDs before reading a file."""
+            files = list_files_for_context()
+            if isinstance(files, str):
+                return files
+            if not files:
+                return "No files found."
+            return "\n".join(f"- {f['name']} (id: {f['id']}, type: {f['type']})" for f in files)
+
+    else:
+        @tool
+        def search_kdrive(target_patient_id: str = "") -> str:
+            """Lists available documents in kDrive.
+            - Without argument: lists all patient folders.
+            - With a patient_id: lists files inside that specific patient's folder.
+            Always use get_patient_id_by_name first if you only have a patient name.
+            Parameter: target_patient_id (optional, leave empty to list all patient folders)."""
+            files = list_files_for_context(target_patient_id or None)
+            if isinstance(files, str):
+                return files
+            if not files:
+                return "No files found."
+            return "\n".join(f"- {f['name']} (id: {f['id']}, type: {f['type']})" for f in files)
 
     @tool
     def read_kdrive_file(file_id: str) -> str:
@@ -174,11 +194,11 @@ def build_kdrive_tools(patient_id: str | None):
 
     @tool
     def summarize_and_store_feedback(content: str, author: str, project: str) -> str:
-        """Summarizes customer feedback and stores it in kDrive.
+        """Summarizes patient feedback and stores it in kDrive.
         ALWAYS call this immediately when a message contains a review, complaint, or suggestion.
         Do NOT promise to save — just call this tool directly.
-        Parameters: content (customer message), author (Telegram ID or name),
-        project (product or topic; use 'general' if unknown)."""
+        Parameters: content (message), author (Telegram ID or name),
+        project (topic; use 'general' if unknown)."""
         now = datetime.now()
         filename = f"feedback_{author}_{now.strftime('%Y-%m-%d_%H-%M')}.txt"
         summary = (
@@ -191,6 +211,5 @@ def build_kdrive_tools(patient_id: str | None):
         if result:
             return f"Feedback stored in kDrive as '{filename}'."
         return f"Error storing feedback: {result}"
-        
-    
+
     return [search_kdrive, read_kdrive_file, summarize_and_store_feedback]
