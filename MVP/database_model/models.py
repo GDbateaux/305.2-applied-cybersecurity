@@ -41,6 +41,19 @@ class Patient(SQLModel, table=True):
     # Relationship: Each patient belongs to one doctor
     doctor: Optional[Doctor] = Relationship(back_populates="patients")
 
+class MessageRelay(SQLModel, table=True):
+    """
+    Maps a specific message sent to a doctor back to the original patient.
+    """
+    __tablename__ = "message_relays"
+
+    # Move primary_key=True inside Column()
+    message_id_in_doctor_chat: int = Field(
+        sa_column=Column(BigInteger(), primary_key=True)
+    )
+    patient_telegram_id: int = Field(sa_column=Column(BigInteger(), nullable=False))
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
 # --- DATABASE CONNECTION ---
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
