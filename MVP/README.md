@@ -15,7 +15,7 @@ Before starting, make sure you have installed:
 Run a PostgreSQL container using Docker:
 
 ```bash
-docker run --name bike-db \
+docker run --name medi-db \
   -e POSTGRES_USER=postgres \
   -e POSTGRES_PASSWORD=mysecretpassword \
   -e POSTGRES_DB=medical_db \
@@ -30,7 +30,7 @@ docker run --name bike-db \
 Create a `.env` file at the root of the project:
 
 ```env
-DATABASE_URL=postgresql://postgres:mysecretpassword@localhost:5432/bike_db
+DATABASE_URL=postgresql://postgres:mysecretpassword@localhost:5432/medi_db
 ```
 
 ---
@@ -53,7 +53,7 @@ To create all tables, run:
 uv run database_model/models.py
 ```
 
-If you want to create tables and populate with initial data you cant run:
+If you want to create tables and populate with initial data you can run:
 
 ```bash
 uv run database_model/seed.py
@@ -66,8 +66,8 @@ uv run database_model/seed.py
 To completely reset the database:
 
 ```bash
-docker stop bike-db
-docker rm bike-db
+docker stop medi-db
+docker rm medi-db
 ```
 
 Then restart it using the previous Docker command.
