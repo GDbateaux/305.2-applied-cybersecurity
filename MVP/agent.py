@@ -9,15 +9,11 @@ from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
-from sqlmodel import Session, create_engine, select
+from sqlmodel import Session, create_engine
 from tools import build_kdrive_tools, STATIC_TOOLS
 from tools.database_tools import build_database_tools, get_patient_by_telegram_id, get_doctor_by_telegram_id, create_patient, get_doctor_list
 from tools.discussion_tools import relay_message_to_doctor
 from datetime import datetime
-from telegram import Update
-from telegram.ext import ContextTypes
-from database_model.models import MessageRelay
-from langchain_openai import ChatOpenAI
 load_dotenv()
 
 engine = create_engine(os.getenv("DATABASE_URL"))
