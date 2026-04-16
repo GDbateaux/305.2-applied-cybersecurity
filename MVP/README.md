@@ -18,7 +18,7 @@ Run a PostgreSQL container using Docker:
 docker run --name bike-db \
   -e POSTGRES_USER=postgres \
   -e POSTGRES_PASSWORD=mysecretpassword \
-  -e POSTGRES_DB=bike_db \
+  -e POSTGRES_DB=medical_db \
   -p 5432:5432 \
   -d postgres
 ```
