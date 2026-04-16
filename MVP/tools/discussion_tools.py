@@ -1,4 +1,5 @@
 import asyncio
+from venv import logger
 from langchain_core.tools import tool
 from sqlmodel import Session, select
 from database_model.models import engine, Patient, MessageRelay
@@ -41,6 +42,8 @@ def relay_message_to_doctor(patient_id: int, message_content: str):
         patient_name  = patient.name
         patient_surname = patient.surname
 
+    logger.info("Relaying message from patient %s %s (TG: %s) to doctor (TG: %s)",
+            patient_name, patient_surname, patient_tg_id, doctor_tg_id)
     # 2. Forward the message to the doctor
     try:
         sent_msg = _send(
