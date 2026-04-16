@@ -5,7 +5,7 @@ from typing import Annotated, TypedDict
 logger = logging.getLogger(__name__)
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage, AIMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -21,10 +21,10 @@ engine = create_engine(os.getenv("DATABASE_URL"))
 # Connection to the LLM
 llm = init_chat_model(
     os.getenv("LLM_MODEL"),
-    model_provider="openrouter",
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY"),
-    temperature=0,  # add some randomness to the responses (we want our agent to alway choose the same tool for the same input)
+    model_provider="openai",
+    base_url=f"https://api.infomaniak.com/2/ai/{os.getenv('INFOMANIAK_PRODUCT_ID')}/openai/v1",
+    api_key=os.getenv("INFOMANIAK_API_KEY"),
+    temperature=0,
 )
 
 conversation_history: dict[int, list] = {}
@@ -33,8 +33,10 @@ class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
     system_prompt: str
 
-def build_system_prompt(role: str, name: str) -> str:
+def build_system_prompt(role: str, name: str, telegram_id: int) -> str:
     today = datetime.now().strftime("%A %d %B %Y, %H:%M")
+
+    tools_block = ""
 
     if role == "doctor":
         context = (
@@ -42,12 +44,43 @@ def build_system_prompt(role: str, name: str) -> str:
             "You have access to all patient records stored in kDrive. "
             "You can also retrieve the list of your patients using the get_patient_list tool."
         )
+        tools_block = """
+        1. search_kdrive —  lists all available documents in kDrive.
+           Always call this first to get the file IDs, then decide which file(s) to read.
+        2. read_kdrive_file — reads the content of a kDrive file by its ID.
+           Use this after search_kdrive. Supports .txt, .csv, .pdf, .docx, .xlsx.
+        3. get_patient_list — returns the list of patients assigned to you.
+           Use this when you ask about your patients.
+        4. get_patient_id_by_name — resolves a patient's ID from their name.
+           Always call this before search_kdrive or read_kdrive_file when referring to a patient by name.
+        """
     elif role == "patient":
         context = (
             f"You are assisting patient {name}. "
             "You only have access to your own medical records. "
             "You can retrieve information about your treating doctor using the get_treating_doctor tool."
         )
+        tools_block = """
+        1. search_kdrive —  lists all available documents in kDrive.
+           Always call this first to get the file IDs, then decide which file(s) to read.
+        2. read_kdrive_file — reads the content of a kDrive file by its ID.
+           Use this after search_kdrive. Supports .txt, .csv, .pdf, .docx, .xlsx.
+        3. check_calendar_availability — (patients only) checks available time slots.
+           Use this as soon as a date or appointment is mentioned.
+        4. create_calendar_event — creates an appointment.
+           Only call this after confirming availability with check_calendar_availability.
+        5. get_treating_doctor — returns the name of your treating doctor.
+           Use this when the patient asks who their doctor is.
+        6. relay_message_to_doctor — relays a message to your doctor.
+        Use this ONLY if the patient EXPLICITLY asks to contact or send a message to their doctor
+        in their LAST message (e.g. "envoie à mon médecin", "contacte mon docteur", "dis-lui que...").
+        If the patient describes a symptom or asks a medical question WITHOUT explicitly requesting
+        to contact their doctor, DO NOT call this tool. Instead:
+        * Search their records first with search_kdrive + read_kdrive_file.
+        * If no relevant information is found, suggest they contact their doctor and ASK for
+            confirmation: "Souhaitez-vous que je transmette ce message à votre médecin ?"
+        * Only call relay_message_to_doctor after the patient confirms.
+        """
     else:
         context = (
             "You are assisting an unknown user. "
@@ -55,43 +88,19 @@ def build_system_prompt(role: str, name: str) -> str:
             "You can create a new patient record for this user using the create_patient tool if they wish to be added as a patient of the practice and if you have all information needed." \
             "You can also provide the list of doctors in the practice using the get_doctor_list tool if they want to choose the doctor."
         )
+        tools_block = """
+        1. create_patient — become a new patient.
+           Use this if the user is unknown and would like to be added as a new patient.
+        2. get_doctor_list — returns the list of doctors at the clinic.
+           Use this if the user ask the list of doctors at the clinic.
+        """
 
     prompt = f"""You are a virtual assistant for a medical practice.
-Today's date and time: {today}
+Today's date and time: {today}. The user you are assisting is a {role} named {name} with Telegram ID: {telegram_id}.
 {context}
 
 You have access to the following tools:
-
-1. search_kdrive — lists all available documents in kDrive.
-   Always call this first to get the file IDs, then decide which file(s) to read.
-
-2. read_kdrive_file — reads the content of a kDrive file by its ID.
-   Use this after search_kdrive. Supports .txt, .csv, .pdf, .docx, .xlsx.
-
-3. check_calendar_availability — (patients only) checks available time slots.
-   Use this as soon as a date or appointment is mentioned.
-
-4. create_calendar_event — (patients only) creates an appointment in the calendar.
-   Only call this after confirming availability with check_calendar_availability.
-
-5. get_patient_list — (doctors only) returns the list of patients assigned to you.
-   Use this when the doctor asks about their patients.
-
-6. get_patient_id_by_name — (doctors only) resolves a patient's ID from their name.
-   Always call this before search_kdrive or read_kdrive_file when referring to a patient by name.
-
-7. get_treating_doctor — (patients only) returns the name of your treating doctor.
-   Use this when the patient asks who their doctor is.
-
-8. relay_message_to_doctor — (patients only) relays a message to your doctor.
-   Use this if the patient explicitly asks to contact their doctor or if 
-   you cannot find a medical answer in the kDrive documents.
-
-9. create_patient — (unknown users) become a new patient.
-   Use this if the user is unknown and would like to be added as a new patient.
-
-10. get_doctor_list — returns the list of doctors at the clinic.
-    Use this if the user ask the list of doctors at the clinic.
+{tools_block}
 
 Important rules:
 - Never share medical information from one patient with another.
@@ -101,10 +110,11 @@ Important rules:
 - If a patient asks for medical advice, a diagnosis, or information about their health:
     * Always start by searching their records with search_kdrive, then read relevant files with read_kdrive_file.
     * If the records contain relevant information or advice, relay it clearly and faithfully.
-    * Whether or not relevant information was found, ALWAYS end your response with:
-      "Pour plus d'informations ou si vous avez des questions, n'hésitez pas à contacter votre médecin traitant."
 - If you don't know or cannot find the answer, say so honestly and suggest contacting the practice directly.
 - When a doctor refers to a patient by name, always call get_patient_id_by_name first to resolve their patient_id before calling search_kdrive or read_kdrive_file.
+- NEVER relay a message to the doctor without explicit confirmation from the patient.
+  If unsure whether the patient wants to contact their doctor, always ask first:
+  "Souhaitez-vous que je transmette ce message à votre médecin ?"
 """
     return prompt
 
@@ -171,7 +181,7 @@ async def handle_message(text: str, telegram_id: int) -> str:
         name = "unknown"
         all_tools = [create_patient, get_doctor_list]
 
-    system_prompt = build_system_prompt(role, name)
+    system_prompt = build_system_prompt(role, name, telegram_id)
     if patient:
         system_prompt += f"\nNote: The current patient_id is {patient.id}."
     agent = build_graph(all_tools)
@@ -190,7 +200,11 @@ async def handle_message(text: str, telegram_id: int) -> str:
     })
 
     # Save only the last 10 messages to keep context manageable
-    conversation_history[telegram_id] = result["messages"][-10:]
+    conversation_history[telegram_id] = [
+        m for m in result["messages"][-10:]
+        if isinstance(m, HumanMessage) or 
+        (isinstance(m, AIMessage) and not m.tool_calls)
+    ]
 
     final = result["messages"][-1].content
     logger.info("[response] telegram_id=%s length=%d", telegram_id, len(final))
