@@ -31,19 +31,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles regular text messages."""
     user_text = update.message.text
-    user_id = update.effective_user.id
+    telegram_id = update.effective_user.id
 
     # To make the bot "typing..."
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
     # Agent call
-    response = await handle_message(text=user_text, user_id=user_id)
+    response = await handle_message(text=user_text, telegram_id=telegram_id)
 
     await update.message.reply_text(response)
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
-    user_id = update.effective_user.id
+    telegram_id = update.effective_user.id
 
     if doc.file_size > MAX_FILE_SIZE_BYTES:
         await update.message.reply_text("File is too large. Max : 20 MB.")
@@ -61,7 +61,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.caption:
         user_message += f"\n\n{update.message.caption}"
 
-    response = await handle_message(text=user_message, user_id=user_id)
+    response = await handle_message(text=user_message, telegram_id=telegram_id)
     await update.message.reply_text(response)
 
 def start_bot():

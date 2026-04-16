@@ -3,6 +3,7 @@ import os
 from sqlmodel import Session, create_engine, select
 from sqlalchemy.orm import joinedload
 from database_model.models import Doctor, Patient
+from langchain_core.tools import tool
 
 def get_patients_by_doctor_telegram(session: Session, doctor_telegram_id: int):
     """
@@ -115,6 +116,59 @@ def get_doctor_by_telegram_id(session: Session, telegram_id: int):
         print(f"Lookup: No doctor found for Telegram ID {telegram_id}")
     
     return doctor
+
+def build_database_tools(engine, id: int):
+
+    @tool
+    def get_patient_list() -> str:
+        """Returns the list of patients assigned to the current doctor with their names and IDs."""
+        with Session(engine) as session:
+            statement = select(Doctor).where(Doctor.id == id)
+            doctor = session.exec(statement).first()
+            if not doctor or not doctor.patients:
+                return "No patients found for this doctor."
+            return "\n".join(
+                f"- {p.name} {p.surname} (patient_id: {p.id})"
+                for p in doctor.patients
+            )
+
+    @tool
+    def get_patient_id_by_name(name: str) -> str:
+        """Finds a patient's ID from their first or last name.
+        Use this when the doctor mentions a patient by name to get their patient_id.
+        Parameter: name (first name, last name, or both)."""
+        with Session(engine) as session:
+            statement = select(Doctor).where(Doctor.id == id)
+            doctor = session.exec(statement).first()
+            if not doctor:
+                return "Doctor not found."
+            matches = [
+                p for p in doctor.patients
+                if name.lower() in p.name.lower() or name.lower() in p.surname.lower()
+            ]
+            if not matches:
+                return f"No patient found matching '{name}'."
+            return "\n".join(
+                f"- {p.name} {p.surname} → patient_id: {p.id}"
+                for p in matches
+            )
+
+    @tool
+    def get_treating_doctor() -> str:
+        """Returns the name of the treating doctor assigned to the current patient."""
+        with Session(engine) as session:
+            statement = (
+                select(Patient)
+                .where(Patient.id == id)
+                .options(joinedload(Patient.doctor))
+            )
+            patient = session.exec(statement).first()
+            if not patient or not patient.doctor:
+                return "No treating doctor found."
+            d = patient.doctor
+            return f"Your treating doctor is Dr. {d.name} {d.surname}."
+
+    return [get_patient_list, get_patient_id_by_name, get_treating_doctor]
 
 if __name__ == "__main__":
     DATABASE_URL = os.getenv("DATABASE_URL")
