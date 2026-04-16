@@ -44,7 +44,7 @@ def seed():
             Patient(telegram_id=555444333, name="Arthur", surname="Morgan", doctor_id=doctors[1].id),
             
             # Patient for Dr. Murphy
-            Patient(telegram_id=666777888, name="Walter", surname="White", doctor_id=doctors[2].id),
+            Patient(telegram_id=5035260982, name="Simon", surname="Masserey", doctor_id=doctors[2].id),
         ]
 
         session.add_all(patients)

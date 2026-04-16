@@ -1,4 +1,5 @@
 import os
+from threading import local
 import requests
 from dotenv import load_dotenv
 from langchain_core.tools import tool
@@ -11,6 +12,8 @@ DRIVE_ID = os.getenv("KDRIVE_DRIVE_ID")
 TOKEN = os.getenv("KDRIVE_TOKEN")
 BASE_URL = f"https://api.infomaniak.com"
 HEADERS = {"Authorization": f"Bearer {TOKEN}"}
+
+BASE_DIRECTORY_ID="72"
 
 def list_information_files_in_folder(folder_id: str):
     url = f"{BASE_URL}/3/drive/{DRIVE_ID}/files/{folder_id}/files"
@@ -28,9 +31,7 @@ def list_information_files_in_folder(folder_id: str):
 
 # Helpers for kDrive interactions
 def list_files_for_patient(patient_id: str):
-    base_directory_id="72"
-
-    result = list_information_files_in_folder(base_directory_id)
+    result = list_information_files_in_folder(BASE_DIRECTORY_ID)
     if isinstance(result, str):
         return result
 
@@ -77,7 +78,37 @@ def download_file(patient_id: str, file_id: str):
         return local_path
     except requests.exceptions.RequestException as e:
         return f"Error downloading file: {e}"
+    
+def download_file_unrestricted(file_id: str):
+    meta_url = f"{BASE_URL}/3/drive/{DRIVE_ID}/files/{file_id}"
+    try:
+        response = requests.get(meta_url, headers=HEADERS)
+        response.raise_for_status()
+        file_obj = response.json().get("data", {})
+    except requests.exceptions.RequestException as e:
+        return f"Error retrieving file metadata: {e}"
 
+    if file_obj.get("type") == "dir":
+        return "Error: Cannot download a directory."
+
+    filename = file_obj.get("name", f"{file_id}.bin")
+
+    local_dir = Path(__file__).parent.parent / "kdrive_cache" / "doctor"
+    local_dir.mkdir(parents=True, exist_ok=True)
+
+    local_path = local_dir / filename
+    download_url = f"{BASE_URL}/2/drive/{DRIVE_ID}/files/{file_id}/download"
+    try:
+        response = requests.get(download_url, headers=HEADERS, stream=True)
+        response.raise_for_status()
+
+        with open(local_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    f.write(chunk)
+        return local_path
+    except requests.exceptions.RequestException as e:
+        return f"Error downloading file: {e}"
 
 def upload_message_summary_KDrive(text_content, filename="uploaded_file.txt"):
     destination_id="38"
@@ -105,19 +136,29 @@ def upload_message_summary_KDrive(text_content, filename="uploaded_file.txt"):
     return True
 
 
-def build_kdrive_tools(patient_id: str):
+def build_kdrive_tools(patient_id: str | None):
+
+    def list_files_for_context():
+        if patient_id is None:
+            return list_information_files_in_folder(BASE_DIRECTORY_ID)
+        else:
+            return list_files_for_patient(patient_id)
+        
+    def download_file_for_context(file_id: str):
+        if patient_id is None:
+            return download_file_unrestricted(file_id)
+        else:
+            return download_file(patient_id, file_id)
+
     @tool
-    def search_kdrive(query: str) -> str:
-        """Lists available documents in the patient's kDrive folder.
-        Always call this first to get file IDs before reading a file.
-        Parameter: query (keyword to filter by name, or 'all' to list everything)."""
-        files = list_files_for_patient(patient_id)
+    def search_kdrive() -> str:
+        """Lists all available documents in the patient's kDrive folder.
+        Always call this first to get the list of file IDs before reading a file."""
+        files = list_files_for_context()
         if isinstance(files, str):
             return files
-        if query.lower() != "all":
-            files = [f for f in files if query.lower() in f["name"].lower()]
         if not files:
-            return "No matching files found."
+            return "No files found."
         return "\n".join(f"- {f['name']} (id: {f['id']}, type: {f['type']})" for f in files)
 
     @tool
@@ -126,7 +167,7 @@ def build_kdrive_tools(patient_id: str):
         Supports: .txt, .csv, .pdf, .docx, .xlsx.
         Use this after search_kdrive to read a specific file.
         Parameter: file_id (the ID returned by search_kdrive)."""
-        local_path = download_file(patient_id, file_id)
+        local_path = download_file_for_context(file_id)
         if isinstance(local_path, str) and local_path.startswith("Error"):
             return f"Download error: {local_path}"
         return extract_text(local_path)
