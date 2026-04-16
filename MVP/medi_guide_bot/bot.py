@@ -28,7 +28,10 @@ logging.basicConfig(
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends a greeting message when the command /start is issued."""
     await update.message.reply_text(
-        "Hello! I am your Python bot. How can I help you today?"
+        "Bonjour 👋\n\n"
+        "Bienvenue.\n"
+        "Je suis l'assistant du cabinet médical.\n\n"
+        "Comment puis-je vous aider aujourd'hui ?"
     )
 
 # Function to handle regular text messages
