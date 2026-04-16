@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:18
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - db_data:/var/lib/postgresql
+    networks:
+      - bot_network
+
+  bot:
+    build: .
+    container_name: telegram_bot
+    restart: on-failure
+    depends_on:
+      - db
+    environment:
+      KDRIVE_TOKEN: ${KDRIVE_TOKEN}
+      KDRIVE_DRIVE_ID: ${KDRIVE_DRIVE_ID}
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      LLM_MODEL: ${LLM_MODEL}
+      CALENDAR_PASSWORD: ${CALENDAR_PASSWORD}
+      CALENDAR_USERNAME: ${CALENDAR_USERNAME}
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+    networks:
+      - bot_network
+
+volumes:
+  db_data:
+
+networks:
+  bot_network:
