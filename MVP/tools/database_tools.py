@@ -118,7 +118,6 @@ def get_doctor_by_telegram_id(session: Session, telegram_id: int):
     return doctor
 
 def build_database_tools(engine, id: int):
-
     @tool
     def get_patient_list() -> str:
         """Returns the list of patients assigned to the current doctor with their names and IDs."""
@@ -167,8 +166,55 @@ def build_database_tools(engine, id: int):
                 return "No treating doctor found."
             d = patient.doctor
             return f"Your treating doctor is Dr. {d.name} {d.surname}."
+    
+    @tool
+    def get_doctor_list() -> str:
+        """Returns a list of all doctors in the system with their names and IDs."""
+        with Session(engine) as session:
+            doctors = session.exec(select(Doctor)).all()
+            if not doctors:
+                return "No doctors found in the system."
+            return "\n".join(
+                f"- Dr. {d.name} {d.surname} (doctor_id: {d.id})"
+                for d in doctors
+            )
 
-    return [get_patient_list, get_patient_id_by_name, get_treating_doctor]
+    return [get_patient_list, get_patient_id_by_name, get_treating_doctor, get_doctor_list]
+
+@tool
+def create_patient(telegram_id: int, doctor_id: int, name: str, surname: str) -> str:
+    """Creates a new patient with the provided details.
+    Parameters: telegram_id (unique Telegram ID), doctor_id (ID of the treating doctor), name (first name), surname (last name)."""
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    engine = create_engine(DATABASE_URL)
+    with Session(engine) as session:
+        patient = get_patient_by_telegram_id(session, telegram_id)
+        doctor = get_doctor_by_telegram_id(session, telegram_id)
+        if patient:
+            return f"Validation Error: Telegram ID {telegram_id} is already registered as a Patient."
+        if doctor:
+            return f"Validation Error: Telegram ID {telegram_id} is already registered as a Doctor."
+        # Create new patient
+        try:
+            create_new_patient(session, telegram_id, doctor_id, name, surname)
+            return f"Patient {name} {surname} successfully created with Telegram ID {telegram_id}."
+        except Exception as e:
+            session.rollback()
+            return f"Database Error: Could not create patient. {e}"
+        
+@tool
+def get_doctor_list() -> str:
+    """Returns a list of all doctors in the system with their names and IDs."""
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    engine = create_engine(DATABASE_URL)
+    with Session(engine) as session:
+        doctors = session.exec(select(Doctor)).all()
+        if not doctors:
+            return "No doctors found in the system."
+        return "\n".join(
+            f"- Dr. {d.name} {d.surname} (doctor_id: {d.id})"
+            for d in doctors
+        )
 
 if __name__ == "__main__":
     DATABASE_URL = os.getenv("DATABASE_URL")

@@ -1,11 +1,15 @@
 import logging
 import sys, os
+import bot_instance
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from agent import handle_message
 from telegram import Update
 from dotenv import load_dotenv
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from tools.file_utils import extract_text
+from sqlmodel import Session, create_engine, select
+from database_model.models import MessageRelay
+import asyncio
 
 MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
 USER_FILES_CACHE = os.path.join(os.path.dirname(__file__), '..', 'user_files_cache')
@@ -64,16 +68,59 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     response = await handle_message(text=user_message, telegram_id=telegram_id)
     await update.message.reply_text(response)
 
+
+async def handle_doctor_reply(update, context):
+    """
+    Register this as a MessageHandler on your Telegram bot.
+    Intercepts the doctor's replies and forwards them to the patient.
+    """
+    msg = update.message
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    engine = create_engine(DATABASE_URL)
+    # Only process messages that are a REPLY to another message
+    if not msg.reply_to_message:
+        return
+
+    replied_to_id = msg.reply_to_message.message_id
+
+    with Session(engine) as session:
+        relay = session.exec(
+            select(MessageRelay).where(
+                MessageRelay.message_id_in_doctor_chat == replied_to_id
+            )
+        ).first()
+
+        if not relay:
+            return  # Not a relayed message, ignore
+
+        patient_tg_id = relay.patient_telegram_id
+
+    # Forward the doctor's reply to the patient
+    await context.bot.send_message(
+        chat_id=patient_tg_id,
+        text=(
+            f"👨‍⚕️ *Reply from your doctor:*\n\n"
+            f"{msg.text}"
+        ),
+        parse_mode="Markdown",
+    )
+
 def start_bot():
     TOKEN = os.getenv("TELEGRAM_TOKEN")
     
     # Build the application
     application = ApplicationBuilder().token(TOKEN).build()
     
+    bot_instance.bot = application.bot
+    bot_instance.loop = asyncio.get_event_loop()
     # Add a handler for the /start command
     start_handler = CommandHandler('start', start)
     application.add_handler(start_handler)
     
+    application.add_handler(
+        MessageHandler(filters.REPLY & filters.TEXT & ~filters.COMMAND, handle_doctor_reply)
+    )
+
     # Add a handler for text messages (filtering out commands)
     echo_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), handle_telegram_message)
     application.add_handler(echo_handler)
@@ -81,6 +128,8 @@ def start_bot():
     # Add a handler for document messages
     application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     
+    
+
     # Start the bot
     print("Bot is polling...")
     application.run_polling()
