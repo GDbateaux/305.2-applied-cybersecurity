@@ -84,6 +84,38 @@ def create_new_patient(session: Session, telegram_id: int, doctor_id: int, name:
         print(f"Database Error: Could not create patient. {e}")
         return None
     
+def get_patient_by_telegram_id(session: Session, telegram_id: int):
+    """
+    Finds and returns a Patient object based on their Telegram ID.
+    Returns None if no patient matches the ID.
+    """
+    # Create the query to filter by the telegram_id column
+    statement = select(Patient).where(Patient.telegram_id == telegram_id)
+    
+    # Execute and get the first result
+    patient = session.exec(statement).first()
+    
+    if not patient:
+        print(f"Lookup: No patient found for Telegram ID {telegram_id}")
+    
+    return patient
+
+def get_doctor_by_telegram_id(session: Session, telegram_id: int):
+    """
+    Finds and returns a Doctor object based on their Telegram ID.
+    Returns None if no doctor matches the ID.
+    """
+    # Create the query to filter by the telegram_id column
+    statement = select(Doctor).where(Doctor.telegram_id == telegram_id)
+    
+    # Execute and get the first result
+    doctor = session.exec(statement).first()
+    
+    if not doctor:
+        print(f"Lookup: No doctor found for Telegram ID {telegram_id}")
+    
+    return doctor
+
 if __name__ == "__main__":
     DATABASE_URL = os.getenv("DATABASE_URL")
     engine = create_engine(DATABASE_URL)
