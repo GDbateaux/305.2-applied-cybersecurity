@@ -33,12 +33,13 @@ def relay_message_to_doctor(patient_id: int, message_content: str):
     with Session(engine) as session:
         patient = session.get(Patient, patient_id)
         if not patient or not patient.doctor:
-            return "Error: No doctor assigned to your profile."
+            return "Erreur : aucun médecin n'est associé à votre profil."
 
         doctor_tg_id  = patient.doctor.telegram_id
         patient_tg_id = patient.telegram_id
         doctor_name   = patient.doctor.surname
         patient_name  = patient.name
+        patient_surname = patient.surname
 
     # 2. Forward the message to the doctor
     try:
@@ -46,10 +47,10 @@ def relay_message_to_doctor(patient_id: int, message_content: str):
             bot_instance.bot,
             chat_id=doctor_tg_id,
             text=(
-                f"🏥 *Message from your patient {patient_name}:*\n\n"
+                f"*Message de votre patient {patient_name} {patient_surname}:*\n\n"
                 f"{message_content}\n\n"
-                f"_Reply directly to this message and your response "
-                f"will be automatically forwarded to the patient._"
+                f"_Répondez directement à ce message et votre réponse "
+                f"sera automatiquement transmise au patient._"
             ),
         )
     except Exception as e:
@@ -63,7 +64,7 @@ def relay_message_to_doctor(patient_id: int, message_content: str):
         ))
         session.commit()
 
-    return f"✅ Your message has been forwarded to Dr. {doctor_name}."
+    return f"Votre message a été transmis à Dr. {doctor_name}."
 
 
 # ── Telegram Handler: doctor's reply → patient ───────────────────────────────
@@ -96,11 +97,11 @@ async def handle_doctor_reply(update, context):
     await context.bot.send_message(
         chat_id=patient_tg_id,
         text=(
-            f"👨‍⚕️ *Reply from your doctor:*\n\n"
+            f"*Réponse de votre médecin:*\n\n"
             f"{msg.text}"
         ),
         parse_mode="Markdown",
     )
 
     # Confirm to the doctor that their reply was delivered
-    await msg.reply_text("✅ Your reply has been forwarded to the patient.")
+    await msg.reply_text("Votre réponse a été transmise au patient.")
