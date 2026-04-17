@@ -31,28 +31,28 @@ def get_calendar(target_name=None):
     return calendars[0]
    
 @tool
-def check_calendar_availability(date: str, time: str, duration_minutes: int) -> str:
-    """Check available time slots in the Infomaniak calendar.
+def check_calendar_availability(date: str, time: str) -> str:
+    """Check available time slots of 30 minutes in the Infomaniak calendar.
 
     Args:
         date (str): Desired date in format YYYY-MM-DD.
         time (str): Preferred start time in format HH:MM (24h).
-        duration_minutes (int): Desired duration of the slot in minutes.
 
     Returns:
         str: One of:
             - A list of up to 5 available time slots within the next 3 days,
-            formatted as "DD/MM/YYYY at HH:MM (duration min)"
+            formatted as "DD/MM/YYYY at HH:MM"
             - "No available slots found in the next 3 days."
             - "Calendar not found."
             - An error message if an exception occurs
     """
+    duration_minutes = 30
     try:
         start_from = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
         duration_hours = duration_minutes / 60
 
 
-        calendar = get_calendar()
+        calendar = get_calendar("Clinique")
         if not calendar:
             return "Calendar not found."
 
@@ -102,26 +102,26 @@ def check_calendar_availability(date: str, time: str, duration_minutes: int) -> 
 
 
 @tool
-def create_calendar_event(title: str, date: str, time: str, duration_minutes: int, description: str) -> str:
-    """Create a calendar event in the Infomaniak calendar.
+def create_calendar_event(title: str, date: str, time: str, description: str) -> str:
+    """Create a calendar event of 30 minutes in the Infomaniak calendar.
 
     Args:
         title (str): Event title.
         date (str): Event date in format YYYY-MM-DD.
         time (str): Event start time in format HH:MM (24h).
-        duration_minutes (int): Duration of the event in minutes.
         description (str): Event description.
 
     Returns:
         str: Confirmation message if the event is created, or an error message
         if the calendar is unavailable, a conflict is detected, or an exception occurs.
     """
+    duration_minutes = 30
     try:
         start_dt = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
         end_dt = start_dt + timedelta(minutes=duration_minutes)
 
 
-        calendar = get_calendar()
+        calendar = get_calendar("Clinique")
         if not calendar:
             return "Calendar not found."
 
