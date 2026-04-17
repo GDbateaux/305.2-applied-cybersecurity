@@ -4,6 +4,8 @@ from langchain_core.tools import tool
 from sqlmodel import Session, select
 from database_model.models import engine, Patient, MessageRelay
 import bot_instance
+from datetime import datetime
+from tools.kdrive_tools import upload_to_patient_folder
 
 
 # ── Thread-safe Telegram message sender ─────────────────────────────────────
@@ -27,17 +29,19 @@ def _send(bot: any, chat_id: int, text: str):
     
 # ── LangChain Tool: patient → doctor ────────────────────────────────────────
 @tool
-def relay_message_to_doctor(patient_id: int, message_content: str):
+def relay_message_to_doctor(patient_id: int, message_content: str, complaint_summary: str):
     """
     Relays a patient's medical question to their assigned doctor via Telegram.
 
     Args:
         patient_id (int): Unique identifier of the patient in the database.
-        message_content (str): The message/question written by the patient.
+        message_content (str): The full message written by the patient.
+        complaint_summary (str): A SHORT 3-6 word summary of the patient's complaint,
+            used as filename (e.g. "douleur_epaule_gauche", "fievre_persistante").
+            Use lowercase, no accents, words separated by underscores.
 
     Returns:
-        str: A confirmation message if the relay succeeds, or an error message
-        if no doctor is assigned or if sending fails.
+        str: A confirmation message if the relay succeeds, or an error message.
     """
 
     # 1. Fetch data from DB
@@ -74,47 +78,8 @@ def relay_message_to_doctor(patient_id: int, message_content: str):
         session.add(MessageRelay(
             message_id_in_doctor_chat=sent_msg.message_id,
             patient_telegram_id=patient_tg_id,
+            patient_complaint=complaint_summary
         ))
         session.commit()
 
     return f"Votre message a été transmis à Dr. {doctor_name}."
-
-
-# ── Telegram Handler: doctor's reply → patient ───────────────────────────────
-async def handle_doctor_reply(update, context):
-    """
-    Register this as a MessageHandler on your Telegram bot.
-    Intercepts the doctor's replies and forwards them to the patient.
-    """
-    msg = update.message
-
-    # Only process messages that are a REPLY to another message
-    if not msg.reply_to_message:
-        return
-
-    replied_to_id = msg.reply_to_message.message_id
-
-    with Session(engine) as session:
-        relay = session.exec(
-            select(MessageRelay).where(
-                MessageRelay.message_id_in_doctor_chat == replied_to_id
-            )
-        ).first()
-
-        if not relay:
-            return  # Not a relayed message, ignore
-
-        patient_tg_id = relay.patient_telegram_id
-
-    # Forward the doctor's reply to the patient
-    await context.bot.send_message(
-        chat_id=patient_tg_id,
-        text=(
-            f"*Réponse de votre médecin:*\n\n"
-            f"{msg.text}"
-        ),
-        parse_mode="Markdown",
-    )
-
-    # Confirm to the doctor that their reply was delivered
-    await msg.reply_text("Votre réponse a été transmise au patient.")

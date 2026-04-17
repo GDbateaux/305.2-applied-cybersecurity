@@ -146,6 +146,40 @@ def add_patient_folder(patient_id: str):
         return response.json().get("data", {})
     except requests.exceptions.RequestException as e:
         return f"Error creating patient folder: {e}"
+    
+def upload_to_patient_folder(patient_id: str, text_content: str, filename: str):
+    """Upload a text file into the patient's kDrive folder."""
+    patient_files = list_information_files_in_folder(BASE_DIRECTORY_ID)
+    if isinstance(patient_files, str):
+        raise Exception(patient_files)
+
+    patient_dir = next(
+        (f for f in patient_files if f["name"] == str(patient_id) and f["type"] == "dir"),
+        None
+    )
+    if not patient_dir:
+        raise Exception(f"No kDrive folder found for patient {patient_id}")
+
+    folder_id = patient_dir["id"]
+    url = f"{BASE_URL}/3/drive/{DRIVE_ID}/upload"
+    encoded = text_content.encode("utf-8")
+
+    params = {
+        "directory_id": int(folder_id),
+        "file_name": filename,
+        "total_size": len(encoded),
+        "conflict": "rename",
+    }
+
+    response = requests.post(
+        url,
+        headers={"Authorization": HEADERS["Authorization"]},
+        params=params,
+        data=encoded,
+    )
+    if not response.ok:
+        raise Exception(f"Upload failed: {response.status_code} {response.text}")
+    return True
 
 def build_kdrive_tools(patient_id: str | None):
     def list_files_for_context(target_patient_id: str | None = None):

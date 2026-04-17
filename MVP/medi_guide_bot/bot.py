@@ -7,8 +7,10 @@ from telegram import Update
 from dotenv import load_dotenv
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 from tools.file_utils import extract_text
+from tools.kdrive_tools import upload_to_patient_folder
 from sqlmodel import Session, create_engine, select
-from database_model.models import MessageRelay
+from database_model.models import MessageRelay, Patient
+from datetime import datetime
 import asyncio
 
 MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
@@ -97,16 +99,30 @@ async def handle_doctor_reply(update, context):
             return  # Not a relayed message, ignore
 
         patient_tg_id = relay.patient_telegram_id
+        patient = session.exec(
+            select(Patient).where(Patient.telegram_id == patient_tg_id)
+        ).first()
+        patient_id = patient.id if patient else None
 
     # Forward the doctor's reply to the patient
     await context.bot.send_message(
         chat_id=patient_tg_id,
         text=(
-            f"👨‍⚕️ *Reply from your doctor:*\n\n"
+            f"👨‍⚕️ *Réponse de votre médecin:*\n\n"
             f"{msg.text}"
         ),
         parse_mode="Markdown",
     )
+
+    if patient_id:
+        now = datetime.now()
+        complaint = relay.patient_complaint or ""
+        filename = f"conseil_medecin_{complaint}_{now.strftime('%Y-%m-%d_%H-%M')}.txt"
+        content = f"Date: {now.strftime('%Y-%m-%d %H:%M')}\nConseil de votre médecin:\n\n{msg.text}\n"
+        try:
+            upload_to_patient_folder(str(patient_id), content, filename)
+        except Exception as e:
+            logging.warning("Failed to save doctor advice to kDrive: %s", e)
 
 def start_bot():
     TOKEN = os.getenv("TELEGRAM_TOKEN")
