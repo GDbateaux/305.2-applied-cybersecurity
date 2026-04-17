@@ -115,7 +115,7 @@ ONLY call `relay_message_to_doctor` if ALL of the following are true:
 
 
     else:
-        context_block = "You are assisting an unregistered user (Telegram ID: {telegram_id})."
+        context_block = f"You are assisting an unregistered user (Telegram ID: {telegram_id})."
         tools_block = """
 ## YOUR TOOLS
 
