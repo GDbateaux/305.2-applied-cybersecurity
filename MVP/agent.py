@@ -2,10 +2,11 @@
 import os
 import logging
 from typing import Annotated, TypedDict
+from unittest import result
 logger = logging.getLogger(__name__)
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage, AIMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -48,6 +49,8 @@ def build_system_prompt(role: str, name: str, telegram_id: int) -> str:
         | 1 | `search_kdrive` | ALWAYS call this first before reading any file. Returns file IDs and metadata. |
         | 2 | `read_kdrive_file` | Call AFTER `search_kdrive` to read a specific file by the ID of the patient. Don't invvent the id, if you don't know the id call get_patient_list. Make sure to use the correct patient ID (if the patient didn't exist don't call this). |
         | 3 | `get_patient_list` | Call this EVERY TIME the doctor asks about their patients. NEVER invent patient names. If you want to search a patient call this funcion |
+        | 4 | `check_calendar_availability` | Call as soon as any appointment or date is mentioned. |
+        | 5 | `create_calendar_event` | Call ONLY after `check_calendar_availability` confirms a slot. |
 
         ## MANDATORY DECISION RULES
 
@@ -75,21 +78,31 @@ def build_system_prompt(role: str, name: str, telegram_id: int) -> str:
 
 ## MEDICAL INFORMATION — STRICT PROTOCOL
 
-When a patient asks ANY medical question, describes a symptom, or requests health advice:
+When a patient mentions ANY symptom, pain, health concern, or medical question:
 
-1. ALWAYS call `search_kdrive` first, then `read_kdrive_file` on every relevant file.
-2. You are ONLY allowed to relay what is LITERALLY written in the patient's records.
-   → NEVER interpret, complete, or enrich the information with your own knowledge.
-   → NEVER suggest a diagnosis, even partial.
-   → NEVER give general medical advice, even well-known facts (e.g. "drink water", "rest").
-3. If the records contain relevant information:
-   → Quote it faithfully and add:
-   "Pour plus d'informations ou si vous avez des questions, contactez votre médecin traitant."
-4. If the records contain NO relevant information:
-   → Say: "Je n'ai pas trouvé d'information à ce sujet dans votre dossier médical."
-   → Then ask: "Souhaitez-vous que je transmette votre question à votre médecin ?"
-5. NEVER answer a medical question from your own training data, even if you are certain.
-   The only valid source of medical information is the patient's kDrive records.
+⚠️ YOU MUST call `search_kdrive` IMMEDIATELY — NO EXCEPTIONS.
+   Do NOT respond before searching. Do NOT say "I don't have information" before searching.
+   Searching the records is MANDATORY, even if you think the answer is not there.
+
+DECISION TREE (follow in order):
+1. Call `search_kdrive` → get the list of files.
+2. Call `read_kdrive_file` on ALL files that could be relevant (do not filter — read them all if unsure).
+3. After reading:
+   a. The file explicitly mentions the exact symptom or body part the patient described
+    (no interpretation allowed) → quote the relevant passage literally, then add:
+    "Pour plus d'informations ou si vous avez des questions, contactez votre médecin traitant."
+   b. No relevant information found → say:
+      "Je n'ai pas trouvé d'information à ce sujet dans votre dossier médical."
+      Then ask: "Souhaitez-vous que je transmette votre question à votre médecin ?"
+
+⛔ STRICT MATCHING RULE:
+   A file is relevant ONLY if it mentions the EXACT symptom or body part the patient described.
+   NEVER infer, extrapolate, or establish medical links between different symptoms or body parts.
+   Example: a file about "douleurs au dos" is NOT relevant for "douleurs aux fessiers".
+   If the match is not explicit in the text, treat it as NOT found → apply rule 3b.      
+
+NEVER skip step 1 and 2. NEVER answer a medical question before completing the search.
+NEVER use your own medical knowledge — only what is in the records.
 
 ## RELAY MESSAGE — STRICT PROTOCOL
 
@@ -226,12 +239,13 @@ async def handle_message(text: str, telegram_id: int) -> str:
         "system_prompt": system_prompt,
     })
 
-    # Save only the last 10 messages to keep context manageable
-    conversation_history[telegram_id] = [
-        m for m in result["messages"][-10:]
-        if isinstance(m, HumanMessage) or 
-        (isinstance(m, AIMessage) and not m.tool_calls)
-    ]
+    # Save only the last 20 messages to keep context manageable
+    raw = result["messages"][-20:]
+
+    # Be sure we start with a HumanMessage or AiMessage to prevent error
+    while raw and isinstance(raw[0], ToolMessage):
+        raw = raw[1:]
+    conversation_history[telegram_id] = raw
 
     final = result["messages"][-1].content
     logger.info("[response] telegram_id=%s length=%d", telegram_id, len(final))

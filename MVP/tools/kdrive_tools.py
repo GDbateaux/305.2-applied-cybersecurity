@@ -218,30 +218,4 @@ def build_kdrive_tools(patient_id: str | None):
             return f"Download error: {local_path}"
         return extract_text(local_path)
 
-    @tool
-    def summarize_and_store_feedback(content: str, author: str, project: str) -> str:
-        """Summarize patient feedback and store it in kDrive.
-
-        Args:
-            content (str): Feedback message content.
-            author (str): Identifier of the author (e.g., Telegram ID or name).
-            project (str): Related project or topic. Use 'general' if unknown.
-
-        Returns:
-            str: Confirmation message with the stored filename, or an error message
-            if storage fails.
-        """
-        now = datetime.now()
-        filename = f"feedback_{author}_{now.strftime('%Y-%m-%d_%H-%M')}.txt"
-        summary = (
-            f"Date: {now.strftime('%Y-%m-%d %H:%M')}\n"
-            f"Author: {author}\n"
-            f"Project: {project}\n\n"
-            f"Content:\n{content}\n"
-        )
-        result = upload_message_summary_KDrive(summary, filename)
-        if result:
-            return f"Feedback stored in kDrive as '{filename}'."
-        return f"Error storing feedback: {result}"
-
-    return [search_kdrive, read_kdrive_file, summarize_and_store_feedback]
+    return [search_kdrive, read_kdrive_file]
