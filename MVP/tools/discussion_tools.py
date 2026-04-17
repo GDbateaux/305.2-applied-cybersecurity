@@ -28,7 +28,17 @@ def _send(bot: any, chat_id: int, text: str):
 # ── LangChain Tool: patient → doctor ────────────────────────────────────────
 @tool
 def relay_message_to_doctor(patient_id: int, message_content: str):
-    """(Patients only) Relays a medical question to your assigned doctor."""
+    """
+    Relays a patient's medical question to their assigned doctor via Telegram.
+
+    Args:
+        patient_id (int): Unique identifier of the patient in the database.
+        message_content (str): The message/question written by the patient.
+
+    Returns:
+        str: A confirmation message if the relay succeeds, or an error message
+        if no doctor is assigned or if sending fails.
+    """
 
     # 1. Fetch data from DB
     with Session(engine) as session:

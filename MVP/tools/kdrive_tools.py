@@ -167,8 +167,12 @@ def build_kdrive_tools(patient_id: str | None):
     if patient_id is not None:
         @tool
         def search_kdrive() -> str:
-            """Lists all documents available in your personal medical folder.
-            Always call this first to get file IDs before reading a file."""
+            """List documents available in the patient's personal medical folder.
+
+            Returns:
+                str: A formatted list of files with their name, ID, and type,
+                or an error message if retrieval fails.
+            """
             files = list_files_for_context()
             if isinstance(files, str):
                 return files
@@ -179,11 +183,16 @@ def build_kdrive_tools(patient_id: str | None):
     else:
         @tool
         def search_kdrive(target_patient_id: str = "") -> str:
-            """Lists available documents in kDrive.
-            - Without argument: lists all patient folders.
-            - With a patient_id: lists files inside that specific patient's folder.
-            Always use get_patient_id_by_name first if you only have a patient name.
-            Parameter: target_patient_id (optional, leave empty to list all patient folders)."""
+            """List documents stored in kDrive.
+
+            Args:
+                target_patient_id (str, optional): Patient ID. If provided, lists files
+                    in that patient's folder. If empty, lists all patient folders.
+
+            Returns:
+                str: A formatted list of files/folders with their name, ID, and type,
+                or an error message if retrieval fails.
+            """
             files = list_files_for_context(target_patient_id or None)
             if isinstance(files, str):
                 return files
@@ -193,33 +202,20 @@ def build_kdrive_tools(patient_id: str | None):
 
     @tool
     def read_kdrive_file(file_id: str) -> str:
-        """Reads the contents of a kDrive file by its ID.
-        Supports: .txt, .csv, .pdf, .docx, .xlsx.
-        Use this after search_kdrive to read a specific file.
-        Parameter: file_id (the ID returned by search_kdrive)."""
+        """Read the content of a kDrive file by its ID.
+
+        Args:
+            file_id (str): File identifier returned by search_kdrive.
+
+        Returns:
+            str: Extracted text content of the file, or an error message.
+
+        Supported formats:
+            .txt, .csv, .pdf, .docx, .xlsx
+        """
         local_path = download_file_for_context(file_id)
         if isinstance(local_path, str) and local_path.startswith("Error"):
             return f"Download error: {local_path}"
         return extract_text(local_path)
 
-    @tool
-    def summarize_and_store_feedback(content: str, author: str, project: str) -> str:
-        """Summarizes patient feedback and stores it in kDrive.
-        ALWAYS call this immediately when a message contains a review, complaint, or suggestion.
-        Do NOT promise to save — just call this tool directly.
-        Parameters: content (message), author (Telegram ID or name),
-        project (topic; use 'general' if unknown)."""
-        now = datetime.now()
-        filename = f"feedback_{author}_{now.strftime('%Y-%m-%d_%H-%M')}.txt"
-        summary = (
-            f"Date: {now.strftime('%Y-%m-%d %H:%M')}\n"
-            f"Author: {author}\n"
-            f"Project: {project}\n\n"
-            f"Content:\n{content}\n"
-        )
-        result = upload_message_summary_KDrive(summary, filename)
-        if result:
-            return f"Feedback stored in kDrive as '{filename}'."
-        return f"Error storing feedback: {result}"
-
-    return [search_kdrive, read_kdrive_file, summarize_and_store_feedback]
+    return [search_kdrive, read_kdrive_file]

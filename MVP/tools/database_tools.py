@@ -124,7 +124,12 @@ def get_doctor_by_telegram_id(session: Session, telegram_id: int):
 def build_database_tools(engine, id: int):
     @tool
     def get_patient_list() -> str:
-        """Returns the list of patients assigned to the current doctor with their names and IDs."""
+        """List patients assigned to the current doctor.
+
+        Returns:
+            str: A formatted list of patients with their full name and patient_id,
+            or a message if no patients are found.
+        """
         with Session(engine) as session:
             statement = select(Doctor).where(Doctor.id == id)
             doctor = session.exec(statement).first()
@@ -136,29 +141,12 @@ def build_database_tools(engine, id: int):
             )
 
     @tool
-    def get_patient_id_by_name(name: str) -> str:
-        """Finds a patient's ID from their first or last name.
-        Use this when the doctor mentions a patient by name to get their patient_id.
-        Parameter: name (first name, last name, or both)."""
-        with Session(engine) as session:
-            statement = select(Doctor).where(Doctor.id == id)
-            doctor = session.exec(statement).first()
-            if not doctor:
-                return "Doctor not found."
-            matches = [
-                p for p in doctor.patients
-                if name.lower() in p.name.lower() or name.lower() in p.surname.lower()
-            ]
-            if not matches:
-                return f"No patient found matching '{name}'."
-            return "\n".join(
-                f"- {p.name} {p.surname} → patient_id: {p.id}"
-                for p in matches
-            )
-
-    @tool
     def get_treating_doctor() -> str:
-        """Returns the name of the treating doctor assigned to the current patient."""
+        """Get the treating doctor assigned to the current patient.
+
+        Returns:
+            str: Doctor's full name, or a message if no doctor is assigned.
+        """
         with Session(engine) as session:
             statement = (
                 select(Patient)
@@ -170,25 +158,23 @@ def build_database_tools(engine, id: int):
                 return "No treating doctor found."
             d = patient.doctor
             return f"Your treating doctor is Dr. {d.name} {d.surname}."
-    
-    @tool
-    def get_doctor_list() -> str:
-        """Returns a list of all doctors in the system with their names and IDs."""
-        with Session(engine) as session:
-            doctors = session.exec(select(Doctor)).all()
-            if not doctors:
-                return "No doctors found in the system."
-            return "\n".join(
-                f"- Dr. {d.name} {d.surname} (doctor_id: {d.id})"
-                for d in doctors
-            )
 
-    return [get_patient_list, get_patient_id_by_name, get_treating_doctor, get_doctor_list]
+    return [get_patient_list, get_treating_doctor]
 
 @tool
 def create_patient(telegram_id: int, doctor_id: int, name: str, surname: str) -> str:
-    """Creates a new patient with the provided details.
-    Parameters: telegram_id (unique Telegram ID), doctor_id (ID of the treating doctor), name (first name), surname (last name)."""
+    """Create a new patient.
+
+    Args:
+        telegram_id (int): Unique Telegram identifier of the patient.
+        doctor_id (int): ID of the assigned doctor.
+        name (str): Patient's first name.
+        surname (str): Patient's last name.
+
+    Returns:
+        str: Success message if the patient is created, or an error message
+        if validation fails or a database error occurs.
+    """
     DATABASE_URL = os.getenv("DATABASE_URL")
     engine = create_engine(DATABASE_URL)
     with Session(engine) as session:
@@ -208,7 +194,12 @@ def create_patient(telegram_id: int, doctor_id: int, name: str, surname: str) ->
         
 @tool
 def get_doctor_list() -> str:
-    """Returns a list of all doctors in the system with their names and IDs."""
+    """List all doctors in the system.
+
+    Returns:
+        str: A formatted list of doctors with their name and doctor_id,
+        or a message if none are found.
+    """
     DATABASE_URL = os.getenv("DATABASE_URL")
     engine = create_engine(DATABASE_URL)
     with Session(engine) as session:

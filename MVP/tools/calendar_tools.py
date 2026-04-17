@@ -33,8 +33,20 @@ def get_calendar(target_name=None):
 @tool
 def check_calendar_availability(date: str, time: str, duration_minutes: int) -> str:
     """Check available time slots in the Infomaniak calendar.
-    Use this as soon as a customer mentions a date for an appointment, delivery, or demo.
-    Parameters: date (YYYY-MM-DD), time (HH:MM as starting point), duration_minutes (slot length)."""
+
+    Args:
+        date (str): Desired date in format YYYY-MM-DD.
+        time (str): Preferred start time in format HH:MM (24h).
+        duration_minutes (int): Desired duration of the slot in minutes.
+
+    Returns:
+        str: One of:
+            - A list of up to 5 available time slots within the next 3 days,
+            formatted as "DD/MM/YYYY at HH:MM (duration min)"
+            - "No available slots found in the next 3 days."
+            - "Calendar not found."
+            - An error message if an exception occurs
+    """
     try:
         start_from = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
         duration_hours = duration_minutes / 60
@@ -91,9 +103,19 @@ def check_calendar_availability(date: str, time: str, duration_minutes: int) -> 
 
 @tool
 def create_calendar_event(title: str, date: str, time: str, duration_minutes: int, description: str) -> str:
-    """Creates an event in the Infomaniak calendar.
-    Call ONLY after check_calendar_availability confirms the slot is free.
-    Parameters: title, date (YYYY-MM-DD), time (HH:MM), duration_minutes, description."""
+    """Create a calendar event in the Infomaniak calendar.
+
+    Args:
+        title (str): Event title.
+        date (str): Event date in format YYYY-MM-DD.
+        time (str): Event start time in format HH:MM (24h).
+        duration_minutes (int): Duration of the event in minutes.
+        description (str): Event description.
+
+    Returns:
+        str: Confirmation message if the event is created, or an error message
+        if the calendar is unavailable, a conflict is detected, or an exception occurs.
+    """
     try:
         start_dt = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
         end_dt = start_dt + timedelta(minutes=duration_minutes)
