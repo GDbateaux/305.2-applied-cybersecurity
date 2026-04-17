@@ -9,25 +9,27 @@ You can access it directly here:
 
 No local installation is required.
 
+You only need a Telegram account (mobile or web) to use the bot.
+
 ---
 
 ## Features
 
 ### Doctor
 
-* View assigned patients (`get_patient_list`)
-* Search a patient by name (`get_patient_id_by_name`)
+* View assigned patients
 * Access patient medical files (via kDrive)
-* Read documents linked to patients
+* Check the doctor's availability
+* Book appointments
+* Reply to patient questions
 
 ---
 
 ### Patient
 
 * Access personal medical records (kDrive)
-* Read documents (PDF, TXT, etc.)
 * Ask medical questions (strictly based on their records)
-* Request appointment slots
+* Check the doctor's availability
 * Book appointments
 * Contact their doctor (via message relay)
 
@@ -126,7 +128,7 @@ uv sync
 uv run main.py
 ```
 
-👉 This will:
+This will:
 
 * Connect to the database
 * Create tables if they do not exist
