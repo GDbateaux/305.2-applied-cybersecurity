@@ -39,6 +39,7 @@ class MessageRelay(SQLModel, table=True):
         sa_column=Column(BigInteger(), primary_key=True)
     )
     patient_telegram_id: int = Field(sa_column=Column(BigInteger(), nullable=False))
+    patient_complaint: str | None = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
