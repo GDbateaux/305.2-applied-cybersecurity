@@ -93,6 +93,21 @@ async def handle_doctor_reply(update, context):
                 text=f"*Réponse de votre médecin:*\n\n{pending['formatted_reply']}",
                 parse_mode="Markdown",
             )
+
+            patient_id = pending.get("patient_id")   
+            complaint = pending.get("complaint", "") 
+
+            if patient_id:
+                now = datetime.now()
+                complaint = pending.get("complaint", "")
+                filename = f"conseil_medecin_{complaint}_{now.strftime('%Y-%m-%d_%H-%M')}.txt"
+                content = f"Date: {now.strftime('%Y-%m-%d %H:%M')}\nConseil de votre médecin:\n\n{pending['raw_reply']}\n"
+                logging.info("Saving to kDrive: patient_id=%s filename=%s", patient_id, filename)  # ← log temporaire
+                try:
+                    upload_to_patient_folder(str(patient_id), content, filename)
+                    logging.info("kDrive save successful")
+                except Exception as e:
+                    logging.warning("Failed to save doctor advice to kDrive: %s", e)
             del bot_instance.pending_doctor_replies[doctor_tg_id]
             await msg.reply_text("Votre réponse a été transmise au patient.")
             return
@@ -128,6 +143,8 @@ async def handle_doctor_reply(update, context):
         
         bot_instance.pending_doctor_replies[doctor_tg_id] = {
             "patient_tg_id": patient_tg_id,
+            "patient_id": patient_id,       
+            "complaint": relay.patient_complaint or "",  
             "raw_reply": msg.text,
             "formatted_reply": formatted_reply or msg.text,
         }
