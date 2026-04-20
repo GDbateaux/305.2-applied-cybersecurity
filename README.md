@@ -5,10 +5,11 @@ It helps patients and doctors interact with medical records, manage appointments
 
 The system is built using:
 
-* **LLM (via Infomaniak / OpenAI-compatible API)** for reasoning
+* **LLM (via Infomaniak: `openai/gpt-oss-120b`)** for reasoning
 * **LangGraph** for tool orchestration
 * **PostgreSQL** for data storage
 * **kDrive** for medical document storage
+* **Infomaniak Calendar** to manage appointments 
 * **Telegram Bot API** for user interaction
 
 ---
