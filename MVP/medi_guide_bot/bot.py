@@ -2,7 +2,7 @@ import logging
 import sys, os
 import bot_instance
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from agent import handle_message
+from agent import handle_message, reformat_doctor_reply
 from telegram import Update
 from dotenv import load_dotenv
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
@@ -12,6 +12,7 @@ from sqlmodel import Session, create_engine, select
 from database_model.models import MessageRelay, Patient
 from datetime import datetime
 import asyncio
+
 
 MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
 USER_FILES_CACHE = os.path.join(os.path.dirname(__file__), '..', 'user_files_cache')
@@ -82,7 +83,24 @@ async def handle_doctor_reply(update, context):
     msg = update.message
     DATABASE_URL = os.getenv("DATABASE_URL")
     engine = create_engine(DATABASE_URL)
+    doctor_tg_id = update.effective_user.id
     # Only process messages that are a REPLY to another message
+    if msg.text and msg.text.strip().lower() in ["oui", "yes", "o", "y"]:
+        pending = bot_instance.pending_doctor_replies.get(doctor_tg_id)
+        if pending:
+            await context.bot.send_message(
+                chat_id=pending["patient_tg_id"],
+                text=f"*Réponse de votre médecin:*\n\n{pending['formatted_reply']}",
+                parse_mode="Markdown",
+            )
+            del bot_instance.pending_doctor_replies[doctor_tg_id]
+            await msg.reply_text("Votre réponse a été transmise au patient.")
+            return
+    if msg.text and msg.text.strip().lower() in ["non", "no", "n"]:
+        if doctor_tg_id in bot_instance.pending_doctor_replies:
+            del bot_instance.pending_doctor_replies[doctor_tg_id]
+            await msg.reply_text("L'envoi a été annulé. Vous pouvez envoyer une nouvelle réponse.")
+            return
     if not msg.reply_to_message:
         return
 
@@ -104,13 +122,27 @@ async def handle_doctor_reply(update, context):
         ).first()
         patient_id = patient.id if patient else None
 
-    # Forward the doctor's reply to the patient
+    is_valid, formatted_reply = await reformat_doctor_reply(msg.text)
+
+    if not is_valid:
+        
+        bot_instance.pending_doctor_replies[doctor_tg_id] = {
+            "patient_tg_id": patient_tg_id,
+            "raw_reply": msg.text,
+            "formatted_reply": formatted_reply or msg.text,
+        }
+        await msg.reply_text(
+            "Votre réponse semble contenir des informations médicales inhabituelles ou potentiellement erronées.\n\n"
+            f"Message qui sera envoyé:\n_{formatted_reply}_\n\n"
+            "Voulez-vous toujours l'envoyer ? Répondez *oui* pour confirmer ou *non* pour annuler.",
+            parse_mode="Markdown",
+        )
+        return
+
+    # Forward the formatted reply to the patient
     await context.bot.send_message(
         chat_id=patient_tg_id,
-        text=(
-            f"👨‍⚕️ *Réponse de votre médecin:*\n\n"
-            f"{msg.text}"
-        ),
+        text=f"*Réponse de votre médecin:*\n\n{formatted_reply}",
         parse_mode="Markdown",
     )
 
@@ -123,6 +155,10 @@ async def handle_doctor_reply(update, context):
             upload_to_patient_folder(str(patient_id), content, filename)
         except Exception as e:
             logging.warning("Failed to save doctor advice to kDrive: %s", e)
+
+    await msg.reply_text("Votre réponse a été transmise au patient.")
+
+
 
 def start_bot():
     TOKEN = os.getenv("TELEGRAM_TOKEN")

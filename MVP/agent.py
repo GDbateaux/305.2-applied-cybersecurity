@@ -194,7 +194,49 @@ def build_graph(tools: list):
     graph.add_edge("tools", "agent")
     return graph.compile()
 
+async def reformat_doctor_reply(raw_reply: str) -> tuple[bool, str]:
+    messages = [
+        SystemMessage(content=(
+            "You are an elite Medical Secretary with high clinical awareness. Your mission is to "
+            "transform a doctor's raw notes into a professional message while strictly monitoring safety.\n\n"
+            
+            "ABSOLUTE RULES:\n"
+            "1. SACRED CONTENT: Never change medical terms, dosages, or clinical intent.\n"
+            "2. PROFESSIONAL TONE: Rewrite for fluidity and politeness (e.g., 'Bonjour, je vous invite à...').\n"
+            "3. MANDATORY STRUCTURE: Start with 'Bonjour,' and end with 'Cordialement, votre médecin'.\n\n"
+            
+            "CRITICAL VALIDITY CHECK (The 'valid' field):\n"
+            "Set 'valid': false if the original message contains:\n"
+            "- INCOHERENCE: Explicitly illogical instructions (e.g., 'Take this every 1 minute').\n"
+            "- DANGER: Dosages that seem life-threatening or extreme (e.g., '100 tablets of Xanax').\n"
+            "- GIBBERISH: Random characters or incomplete thoughts that make no sense.\n"
+            "- OFFENSIVE: Inappropriate or unprofessional language towards the patient.\n"
+            "If 'valid' is false, still provide the reformat, but the system will flag it for the doctor.\n\n"
+            
+            "Respond ONLY in this JSON format:\n"
+            "{\n"
+            '  "valid": true or false,\n'
+            '  "message": "the professionally reformatted message"\n'
+            "}\n\n"
+            "Always respond in French unless the doctor wrote in another language."
+        )),
+        HumanMessage(content=(
+            f"Doctor's original message (reformat this exactly, do not interpret it):\n"
+            f"\"{raw_reply}\""
+        ))
+    ]
 
+    response = await llm.ainvoke(messages)
+
+    import json
+    try:
+        data = json.loads(response.content)
+        is_valid = data.get("valid", True)
+        message = data.get("message", raw_reply)
+        return is_valid, message or raw_reply
+    except json.JSONDecodeError:
+        return True, response.content
+    
 # Interface function
 async def handle_message(text: str, telegram_id: int) -> str:
     with Session(engine) as session:
