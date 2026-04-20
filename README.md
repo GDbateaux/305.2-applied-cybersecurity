@@ -146,8 +146,15 @@ graph TD
         PatTools --> Relay[Message Relay System]
     end
 
-    %% Output
-    EndNode --> FinalResponse[Final Formatted Message]
+    %% Output Refinement (The New Part)
+    subgraph Refinement ["Output Refinement"]
+        EndNode --> RoleCheck{Is Doctor?}
+        RoleCheck -->|Yes| SecNode[Node: Medical Secretary]
+        SecNode -->|Professional Rewrite| FinalResponse[Final Formatted Message]
+        RoleCheck -->|No / Patient| FinalResponse
+    end
+
+    %% Final Delivery
     FinalResponse --> TG_Bot
     TG_Bot --> User
 
@@ -157,4 +164,6 @@ graph TD
     style KD fill:#494540,stroke:#e65100
     style Cal fill:#576b59,stroke:#1b5e20
     style Identification fill:#3d3d3d,stroke:#333
+    style Refinement fill:#2d3436,stroke:#00b894
+    style SecNode fill:#00b894,stroke:#fff,color:#fff
 ```
