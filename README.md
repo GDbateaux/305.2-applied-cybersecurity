@@ -29,6 +29,33 @@ The assistant uses a **tool-based architecture**:
 6. The assistant responds based only on trusted data sources
 
 ---
+## Doctor Reply Processing (LLM Safety Layer)
+
+When a doctor replies to a patient, the message does not go directly to the patient.
+
+Instead, it goes through an AI validation layer before being delivered.
+
+### Steps
+
+#### 1. Formatting
+- The doctor's message is rewritten by the LLM
+- Improves clarity, tone, and structure
+- Keeps the exact same medical meaning (no additions, no modifications)
+
+#### 2. Message Validation
+- The system analyzes the message to detect if it is:
+  - unclear
+  - incomplete
+  - potentially inappropriate or confusing for a patient
+
+- The validation is based only on the message itself  
+- No access to medical records is used at this stage
+
+#### 3. Decision Logic
+- If the message is clear and appropriate → it is sent to the patient
+- If the message is flagged as problematic → the doctor is warned and asked to confirm or revise
+
+---
 
 ## Roles & Capabilities
 
@@ -44,6 +71,7 @@ Doctors have access to patient management and medical records:
 
   * Check availability
   * Create calendar events
+* Reply to patients with AI-assisted formatting and safety checks
 
 Doctors cannot access patients outside their scope.
 
