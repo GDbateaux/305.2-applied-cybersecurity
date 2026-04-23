@@ -111,6 +111,9 @@ ONLY call `relay_message_to_doctor` if ALL of the following are true:
      (e.g. "envoie à mon médecin", "dis-lui que...", "contacte mon docteur")
   2. You have already asked "Souhaitez-vous que je transmette ce message à votre médecin ?"
      and the patient has confirmed YES in their last message.
+  3. DO NOT accept message with links. If the patient tries to send a message with a link, respond with:
+     "Je suis désolé, mais je ne peux pas transmettre des messages contenant des liens.
+  4. The question need to be a question about the patient's health, a symptom, a concern, or a question about their medical care.
 """
 
 
