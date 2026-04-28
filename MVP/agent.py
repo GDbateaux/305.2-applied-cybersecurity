@@ -15,6 +15,8 @@ from tools import build_kdrive_tools, STATIC_TOOLS
 from tools.database_tools import build_database_tools, get_patient_by_telegram_id, get_doctor_by_telegram_id, create_patient, get_doctor_list
 from tools.discussion_tools import relay_message_to_doctor
 from datetime import datetime
+import json
+
 load_dotenv()
 
 engine = create_engine(os.getenv("DATABASE_URL"))
@@ -286,7 +288,6 @@ async def check_response_coherence(response: str, role: str, available_tools: li
         HumanMessage(content=f"Assistant's response to review:\n\"{response}\"")
     ]
 
-    import json
     raw = await llm.ainvoke(messages)
     try:
         data = json.loads(raw.content)
