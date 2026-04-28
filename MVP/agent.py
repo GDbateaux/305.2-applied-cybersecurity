@@ -152,6 +152,10 @@ Today: {today}
    If the records do not contain the answer, you do not have the answer.
 4. If you cannot find an answer through your tools, say so honestly and suggest
    the user contact the practice directly.
+5. NEVER answer two questions in a single response. If the user asks multiple questions,
+   answer only the one that requires a tool first, then ask the user to repeat the other.
+6. If a message contains both a medical/practice question AND an unrelated question,
+   answer ONLY the medical/practice question and ignore the unrelated one entirely.
 
 ## LANGUAGE
 
@@ -239,6 +243,62 @@ async def reformat_doctor_reply(raw_reply: str) -> tuple[bool, str]:
         return is_valid, message or raw_reply
     except json.JSONDecodeError:
         return True, response.content
+
+async def check_response_coherence(response: str, role: str, available_tools: list[str], tool_results: list[str] = []) -> tuple[bool, str]:
+    
+    tools_str = ", ".join(available_tools)
+    tool_results_str = "\n".join(tool_results) if tool_results else "No tool results available."
+
+    role_context = {
+        "doctor": "The user is a DOCTOR. The assistant can discuss patient lists, medical files, appointments.",
+        "patient": "The user is a PATIENT. The assistant can only discuss this patient's own records, appointments, and relay messages to their doctor.",
+        "unknown": "The user is UNREGISTERED. The assistant can only help them register as a patient or list available doctors.",
+    }.get(role, "")
+
+    messages = [
+        SystemMessage(content=(
+            "You are a quality controller for a medical practice chatbot.\n\n"
+            f"CONTEXT: {role_context}\n"
+            f"TOOLS the assistant had access to: {tools_str}\n\n"
+            f"DATA RETRIEVED BY TOOLS DURING THIS CONVERSATION:\n{tool_results_str}\n"
+            "Any information present in the tool results above is VERIFIED and must NOT be flagged.\n\n"
+            "Flag as INCOHERENT (coherent: false) ONLY if the response:\n"
+            "- Provides a medical diagnosis from its own knowledge (not from records)\n"
+            "- Mentions data that is NOT in the tool results above AND was not retrieved by a tool\n"
+            "- Shares one patient's data with another patient\n"
+            "- Is rude, offensive, or clearly unprofessional\n"
+            "- Is completely off-topic for a medical practice\n\n"
+            "These are COHERENT and must NOT be flagged:\n"
+            "- Any data that appears in the tool results above\n"
+            "- Polite refusals or honest admissions of not finding information\n"
+            "- Suggestions to contact the practice directly\n"
+            "- Asking the user for clarification\n"
+            "- Confirming an action was performed\n\n"
+            "If INCOHERENT, rewrite a safe fallback that apologizes briefly and suggests "
+            "contacting the practice directly.\n\n"
+            "Respond ONLY in this exact JSON format:\n"
+            "{\n"
+            '  "coherent": true or false,\n'
+            '  "response": "the original or corrected response"\n'
+            "}\n\n"
+            "Always respond in French unless the original response is in another language."
+        )),
+        HumanMessage(content=f"Assistant's response to review:\n\"{response}\"")
+    ]
+
+    import json
+    raw = await llm.ainvoke(messages)
+    try:
+        data = json.loads(raw.content)
+        is_coherent = data.get("coherent", True)
+        final_response = data.get("response", response)
+        if is_coherent:
+            logger.info("[quality_check] OK | role=%s", role)
+        else:
+            logger.warning("[quality_check] incoherent | role=%s | fallback sent", role)
+        return is_coherent, final_response or response
+    except json.JSONDecodeError:
+        return True, response
     
 # Interface function
 async def handle_message(text: str, telegram_id: int) -> str:
@@ -278,11 +338,19 @@ async def handle_message(text: str, telegram_id: int) -> str:
     # Add user message to history
     conversation_history[telegram_id].append(HumanMessage(content=text))
 
+    # Snapshot before invoke
+    messages_before = len(conversation_history[telegram_id])
+
     # Send history to agent
     result = await agent.ainvoke({
         "messages": conversation_history[telegram_id],
         "system_prompt": system_prompt,
     })
+
+    # Only count tool messages from THIS turn
+    new_messages = result["messages"][messages_before:]
+    tool_messages_this_turn = [msg for msg in new_messages if isinstance(msg, ToolMessage)]
+
 
     # Save only the last 20 messages to keep context manageable
     raw = result["messages"][-20:]
@@ -291,7 +359,14 @@ async def handle_message(text: str, telegram_id: int) -> str:
     while raw and isinstance(raw[0], ToolMessage):
         raw = raw[1:]
     conversation_history[telegram_id] = raw
-
     final = result["messages"][-1].content
     logger.info("[response] telegram_id=%s length=%d", telegram_id, len(final))
+
+    if not tool_messages_this_turn:
+        logger.info("[quality_check] no tools used this turn — running coherence check")
+        tools_names = [t.name for t in all_tools]
+        _, final = await check_response_coherence(final, role, tools_names)
+    else:
+        logger.info("[quality_check] skipped — %d tool(s) used this turn", len(tool_messages_this_turn))
+
     return final
