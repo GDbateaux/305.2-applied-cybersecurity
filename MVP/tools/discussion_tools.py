@@ -6,6 +6,7 @@ from database_model.models import engine, Patient, MessageRelay
 import bot_instance
 from datetime import datetime
 from tools.kdrive_tools import upload_to_patient_folder
+from urlextract import URLExtract
 
 
 # ── Thread-safe Telegram message sender ─────────────────────────────────────
@@ -43,7 +44,10 @@ def relay_message_to_doctor(patient_id: int, message_content: str, complaint_sum
     Returns:
         str: A confirmation message if the relay succeeds, or an error message.
     """
+    extractor = URLExtract()
 
+    if extractor.has_urls(message_content):
+        return "Erreur : Liens interdits."
     # 1. Fetch data from DB
     with Session(engine) as session:
         patient = session.get(Patient, patient_id)
